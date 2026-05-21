@@ -6,8 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
-import { Clock, Plus, ArrowRight, Loader2 } from "lucide-react"
+import { Clock, Plus, ArrowRight, Loader2, MessageSquare } from "lucide-react"
 import { supabase } from "@/lib/supabase/client"
+import { Comments } from "@/components/ui/comments"
 
 type TaskType = {
   id: string
@@ -187,6 +188,7 @@ export default function TasksPage() {
                           <Clock className="w-3.5 h-3.5" />
                           <span>{task.due_date}</span>
                         </div>
+                        <Comments taskId={task.id} />
                       </CardContent>
                       <CardFooter className="p-4 pt-0 flex justify-between items-center mt-2 border-t pt-3 border-border/50">
                         <Avatar className="w-6 h-6">
