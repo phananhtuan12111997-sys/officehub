@@ -69,6 +69,8 @@ export async function GET(req: Request) {
 
     if (folderId) {
       query = query.eq('folder_id', folderId)
+    } else if (!searchQuery) {
+      query = query.is('folder_id', null)
     }
 
     if (searchQuery) {

@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { supabase } from "@/lib/supabase/client"
-import { Loader2, ArrowRight, Paperclip } from "lucide-react"
+import { Loader2, ArrowRight, Paperclip, Edit2 } from "lucide-react"
 import { FileUpload, Attachment } from "@/components/ui/file-upload"
 import Link from "next/link"
 
@@ -26,6 +26,7 @@ export default function FeedPage() {
   const [showForm, setShowForm] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [editingPostId, setEditingPostId] = useState<string | null>(null)
   
   // Form state
   const [title, setTitle] = useState("")
@@ -71,26 +72,61 @@ export default function FeedPage() {
     const { data: { user } } = await supabase.auth.getUser()
     const authorName = user?.email?.split('@')[0] || "Người dùng"
 
-    const { error } = await supabase
-      .from('posts')
-      .insert({
-        title,
-        content,
-        department,
-        author_name: authorName,
-        attachments: attachments.length > 0 ? attachments : []
-      })
+    if (editingPostId) {
+      const { error } = await supabase
+        .from('posts')
+        .update({
+          title,
+          content,
+          department,
+          attachments: attachments.length > 0 ? attachments : []
+        })
+        .eq('id', editingPostId)
 
-    if (error) {
-      alert("Lỗi đăng bài: " + error.message)
+      if (error) {
+        alert("Lỗi sửa bài: " + error.message)
+      } else {
+        resetForm()
+        await fetchPosts()
+      }
     } else {
-      setTitle("")
-      setContent("")
-      setAttachments([])
-      setShowForm(false)
-      await fetchPosts()
+      const { error } = await supabase
+        .from('posts')
+        .insert({
+          title,
+          content,
+          department,
+          author_name: authorName,
+          attachments: attachments.length > 0 ? attachments : []
+        })
+
+      if (error) {
+        alert("Lỗi đăng bài: " + error.message)
+      } else {
+        resetForm()
+        await fetchPosts()
+      }
     }
     setIsSubmitting(false)
+  }
+
+  const resetForm = () => {
+    setTitle("")
+    setContent("")
+    setDepartment("Chung")
+    setAttachments([])
+    setShowForm(false)
+    setEditingPostId(null)
+  }
+
+  const handleEditPost = (post: PostType) => {
+    setTitle(post.title)
+    setContent(post.content)
+    setDepartment(post.department || "Chung")
+    setAttachments(post.attachments || [])
+    setEditingPostId(post.id)
+    setShowForm(true)
+    window.scrollTo({ top: 0, behavior: "smooth" })
   }
 
   return (
@@ -101,7 +137,13 @@ export default function FeedPage() {
           <p className="text-muted-foreground mt-1">Thông báo và cập nhật mới nhất từ ban điều hành.</p>
         </div>
         {isAdmin && (
-          <Button onClick={() => setShowForm(!showForm)} className="bg-primary text-primary-foreground hover:bg-primary/90">
+          <Button onClick={() => {
+            if (showForm) {
+              resetForm()
+            } else {
+              setShowForm(true)
+            }
+          }} className="bg-primary text-primary-foreground hover:bg-primary/90">
             {showForm ? "Đóng form" : "Đăng thông báo mới"}
           </Button>
         )}
@@ -110,7 +152,7 @@ export default function FeedPage() {
       {showForm && (
         <Card className="border-primary/50 shadow-md">
           <CardHeader className="bg-muted/30 pb-4">
-            <CardTitle className="text-lg text-primary">Tạo bản tin mới</CardTitle>
+            <CardTitle className="text-lg text-primary">{editingPostId ? "Chỉnh sửa bản tin" : "Tạo bản tin mới"}</CardTitle>
           </CardHeader>
           <CardContent className="pt-4">
             <form onSubmit={handleSubmit} className="flex flex-col gap-5">
@@ -154,10 +196,10 @@ export default function FeedPage() {
                 />
               </div>
               <div className="flex justify-end gap-3 mt-2 border-t pt-4">
-                <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Hủy bỏ</Button>
+                <Button type="button" variant="outline" onClick={resetForm}>Hủy bỏ</Button>
                 <Button type="submit" disabled={isSubmitting} className="min-w-[120px]">
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Đăng bài
+                  {editingPostId ? "Lưu thay đổi" : "Đăng bài"}
                 </Button>
               </div>
             </form>
@@ -180,9 +222,16 @@ export default function FeedPage() {
                   <span className="text-xs font-semibold uppercase tracking-wider text-primary bg-primary/10 px-2 py-1 rounded-md">
                     {post.department || "Tin tức"}
                   </span>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(post.created_at).toLocaleDateString('vi-VN')}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(post.created_at).toLocaleDateString('vi-VN')}
+                    </span>
+                    {isAdmin && (
+                      <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={() => handleEditPost(post)} title="Sửa thông báo">
+                        <Edit2 className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 <CardTitle className="text-xl font-bold leading-tight line-clamp-2 hover:text-primary transition-colors">
                   <Link href={`/post/${post.id}`}>{post.title}</Link>
