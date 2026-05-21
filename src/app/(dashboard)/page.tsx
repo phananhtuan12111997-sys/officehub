@@ -97,7 +97,7 @@ export default function FeedPage() {
     <div className="flex flex-col gap-6 max-w-5xl mx-auto">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b pb-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-primary">Tin tức & Sự kiện</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-primary">Thông Báo</h1>
           <p className="text-muted-foreground mt-1">Thông báo và cập nhật mới nhất từ ban điều hành.</p>
         </div>
         {isAdmin && (

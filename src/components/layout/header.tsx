@@ -2,8 +2,8 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
-import { Menu, Search, User } from "lucide-react"
+import { useEffect, useState, useRef } from "react"
+import { Menu, Search, User, FileText, CheckSquare, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -22,13 +22,74 @@ export function Header() {
   const router = useRouter()
   const [profile, setProfile] = useState<any>(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const [isFocused, setIsFocused] = useState(false)
+  
+  // Suggestions state
+  const [suggestions, setSuggestions] = useState<{posts: any[], tasks: any[]}>({ posts: [], tasks: [] })
+  const [isLoading, setIsLoading] = useState(false)
+  const wrapperRef = useRef<HTMLDivElement>(null)
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     if (searchQuery.trim()) {
       router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`)
+      setIsFocused(false)
     }
   }
+
+  // Handle click outside to close suggestions
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        setIsFocused(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [wrapperRef])
+
+  // Debounced search for suggestions
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      if (!searchQuery.trim() || searchQuery.trim().length < 2) {
+        setSuggestions({ posts: [], tasks: [] })
+        return
+      }
+
+      setIsLoading(true)
+      const query = searchQuery.trim()
+
+      // Fetch top 3 posts
+      const { data: postsData } = await supabase
+        .from('posts')
+        .select('id, title, department')
+        .or(`title.ilike.%${query}%,content.ilike.%${query}%`)
+        .order('created_at', { ascending: false })
+        .limit(3)
+
+      // Fetch top 3 tasks
+      const { data: tasksData } = await supabase
+        .from('tasks')
+        .select('id, title, assignee, status')
+        .or(`title.ilike.%${query}%,assignee.ilike.%${query}%`)
+        .order('created_at', { ascending: false })
+        .limit(3)
+
+      setSuggestions({
+        posts: postsData || [],
+        tasks: tasksData || []
+      })
+      setIsLoading(false)
+    }
+
+    const timeoutId = setTimeout(() => {
+      fetchSuggestions()
+    }, 300) // 300ms debounce
+
+    return () => clearTimeout(timeoutId)
+  }, [searchQuery])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -51,7 +112,7 @@ export function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b border-primary-foreground/20 bg-primary text-primary-foreground px-4 sm:h-16 sm:px-6 shadow-sm">
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b border-primary-foreground/20 bg-primary text-primary-foreground px-4 sm:h-16 sm:px-6 shadow-sm relative">
       {/* Mobile Menu Trigger */}
       <Button size="icon" variant="outline" className="sm:hidden border-primary-foreground/20 bg-transparent hover:bg-primary-foreground/10 text-primary-foreground hover:text-white">
         <Menu className="h-5 w-5" />
@@ -66,18 +127,106 @@ export function Header() {
       </div>
 
       {/* Search (PC only) */}
-      <div className="hidden flex-1 sm:flex md:grow-0">
-        <form onSubmit={handleSearch}>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-foreground/50" />
+      <div className="hidden flex-1 sm:flex md:grow-0" ref={wrapperRef}>
+        <form onSubmit={handleSearch} className="relative w-full">
+          <div className="relative group">
+            <button 
+              type="submit" 
+              className="absolute left-1 top-1/2 -translate-y-1/2 p-1.5 text-foreground/50 hover:text-foreground hover:bg-muted rounded-md transition-colors"
+              title="Tìm kiếm"
+            >
+              <Search className="h-4 w-4" />
+            </button>
             <Input
               type="search"
-              placeholder="Tìm kiếm bài viết, tài liệu..."
-              className="w-full rounded-lg bg-background text-foreground pl-8 md:w-[200px] lg:w-[320px]"
+              placeholder="Tìm kiếm bài viết, tài liệu, công việc..."
+              className="w-full rounded-lg bg-background text-foreground pl-9 md:w-[260px] lg:w-[400px]"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => setIsFocused(true)}
             />
           </div>
+
+          {/* Search Suggestions Dropdown */}
+          {isFocused && searchQuery.trim().length >= 2 && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-background border rounded-lg shadow-xl overflow-hidden z-50 flex flex-col max-h-[70vh]">
+              {isLoading ? (
+                <div className="p-4 flex items-center justify-center text-muted-foreground gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Đang tìm kiếm...
+                </div>
+              ) : suggestions.posts.length === 0 && suggestions.tasks.length === 0 ? (
+                <div className="p-4 text-center text-sm text-muted-foreground">
+                  Không tìm thấy kết quả phù hợp
+                </div>
+              ) : (
+                <div className="overflow-y-auto py-2">
+                  {/* Bài viết section */}
+                  {suggestions.posts.length > 0 && (
+                    <div className="px-2 pb-1">
+                      <div className="text-xs font-semibold text-muted-foreground px-2 py-1 mb-1 uppercase tracking-wider">Bài viết & Thông báo</div>
+                      {suggestions.posts.map(post => (
+                        <Link 
+                          key={post.id} 
+                          href={`/post/${post.id}`}
+                          onClick={() => setIsFocused(false)}
+                          className="flex items-start gap-3 px-2 py-2 hover:bg-muted rounded-md transition-colors"
+                        >
+                          <div className="bg-primary/10 p-1.5 rounded text-primary mt-0.5 shrink-0">
+                            <FileText className="h-4 w-4" />
+                          </div>
+                          <div className="flex flex-col overflow-hidden">
+                            <span className="text-sm font-medium text-foreground truncate">{post.title}</span>
+                            <span className="text-xs text-muted-foreground truncate">{post.department || "Tin tức"}</span>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Divider if both exist */}
+                  {suggestions.posts.length > 0 && suggestions.tasks.length > 0 && (
+                    <div className="h-px bg-border my-2 mx-4" />
+                  )}
+
+                  {/* Công việc section */}
+                  {suggestions.tasks.length > 0 && (
+                    <div className="px-2 pt-1">
+                      <div className="text-xs font-semibold text-muted-foreground px-2 py-1 mb-1 uppercase tracking-wider">Công việc</div>
+                      {suggestions.tasks.map(task => (
+                        <Link 
+                          key={task.id} 
+                          href={`/tasks`} // Navigate to tasks page (since we don't have individual task pages)
+                          onClick={() => setIsFocused(false)}
+                          className="flex items-start gap-3 px-2 py-2 hover:bg-muted rounded-md transition-colors"
+                        >
+                          <div className="bg-orange-500/10 p-1.5 rounded text-orange-600 mt-0.5 shrink-0">
+                            <CheckSquare className="h-4 w-4" />
+                          </div>
+                          <div className="flex flex-col overflow-hidden">
+                            <span className="text-sm font-medium text-foreground truncate">{task.title}</span>
+                            <span className="text-xs text-muted-foreground truncate">
+                              Giao cho: {task.assignee}
+                            </span>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="px-4 pt-3 pb-1 mt-2 border-t">
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      className="w-full text-primary hover:text-primary hover:bg-primary/10 text-sm h-8"
+                      onClick={handleSearch}
+                    >
+                      Xem tất cả kết quả cho "{searchQuery}"
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </form>
       </div>
 

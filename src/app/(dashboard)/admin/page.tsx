@@ -152,10 +152,8 @@ export default function AdminPage() {
           <p className="text-muted-foreground">Quản lý tài khoản, phân quyền và giám sát nhân viên.</p>
         </div>
         
+        <Button onClick={() => setIsDialogOpen(true)}><Plus className="mr-2 h-4 w-4" /> Thêm nhân viên</Button>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button><Plus className="mr-2 h-4 w-4" /> Thêm nhân viên</Button>
-          </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Tạo tài khoản mới</DialogTitle>
