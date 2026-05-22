@@ -29,6 +29,7 @@ type TaskType = {
   status: string
   created_at: string
   attachments?: any[]
+  creator_id?: string
 }
 
 const COLUMNS = [
@@ -42,6 +43,7 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  
   
   // Data lists
   const [users, setUsers] = useState<any[]>([])
@@ -65,8 +67,14 @@ export default function TasksPage() {
   const [editTaskData, setEditTaskData] = useState<Partial<TaskType>>({})
   const [editTaskNewFiles, setEditTaskNewFiles] = useState<File[]>([])
   const [isUpdating, setIsUpdating] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
   useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) {
+        setCurrentUserId(data.session.user.id)
+      }
+    })
     fetchTasks()
     fetchUsers()
     fetchDepartments()
@@ -149,7 +157,8 @@ export default function TasksPage() {
         due_date: dueDate || "Không có hạn", // Fallback for old UI text if needed
         due_date_timestamp: dueDate ? new Date(dueDate).toISOString() : null,
         status: 'new',
-        attachments: uploadedAttachments
+        attachments: uploadedAttachments,
+        creator_id: currentUserId || null
       })
       .select()
       .single()
@@ -588,23 +597,27 @@ export default function TasksPage() {
               <div className="flex items-center gap-1">
                 {!isEditingTask && selectedTask && (
                   <>
-                    <Button variant="ghost" size="icon" onClick={() => {
-                      setEditTaskData({
-                        title: selectedTask.title,
-                        description: selectedTask.description || "",
-                        due_date: selectedTask.due_date_timestamp ? new Date(selectedTask.due_date_timestamp).toISOString().split('T')[0] : selectedTask.due_date !== "Không có hạn" ? selectedTask.due_date : "",
-                        priority: selectedTask.priority,
-                        assignee_id: selectedTask.assignee_id || "",
-                        department_id: selectedTask.department_id || "",
-                        attachments: selectedTask.attachments || []
-                      })
-                      setIsEditingTask(true)
-                    }}>
-                      <Edit className="w-4 h-4 text-muted-foreground" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDeleteTask(selectedTask.id)} className="hover:bg-destructive/10">
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
+                    {(!selectedTask.creator_id || selectedTask.creator_id === currentUserId) && (
+                      <>
+                        <Button variant="ghost" size="icon" onClick={() => {
+                          setEditTaskData({
+                            title: selectedTask.title,
+                            description: selectedTask.description || "",
+                            due_date: selectedTask.due_date_timestamp ? new Date(selectedTask.due_date_timestamp).toISOString().split('T')[0] : selectedTask.due_date !== "Không có hạn" ? selectedTask.due_date : "",
+                            priority: selectedTask.priority,
+                            assignee_id: selectedTask.assignee_id || "",
+                            department_id: selectedTask.department_id || "",
+                            attachments: selectedTask.attachments || []
+                          })
+                          setIsEditingTask(true)
+                        }}>
+                          <Edit className="w-4 h-4 text-muted-foreground" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDeleteTask(selectedTask.id)} className="hover:bg-destructive/10">
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </>
+                    )}
                   </>
                 )}
               </div>
