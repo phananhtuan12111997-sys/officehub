@@ -34,9 +34,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Admin only" }, { status: 403 })
     }
 
-    const { name } = await req.json()
-    console.log("Inserting folder:", name)
-    const { data, error } = await supabaseAdmin.from("document_folders").insert({ name }).select()
+    const { name, department } = await req.json()
+    console.log("Inserting folder:", name, "for department:", department)
+    const { data, error } = await supabaseAdmin.from("document_folders").insert({ name, department: department || 'Chung' }).select()
 
     if (error) {
       console.log("Insert error:", error)
@@ -86,10 +86,10 @@ export async function PATCH(req: Request) {
     const { data: profile } = await supabaseAdmin.from("profiles").select("role").eq("id", user.id).single()
     if (profile?.role !== "admin") return NextResponse.json({ error: "Admin only" }, { status: 403 })
 
-    const { id, name } = await req.json()
+    const { id, name, department } = await req.json()
     if (!id || !name) return NextResponse.json({ error: "Missing fields" }, { status: 400 })
 
-    const { data, error } = await supabaseAdmin.from("document_folders").update({ name }).eq("id", id).select()
+    const { data, error } = await supabaseAdmin.from("document_folders").update({ name, department: department || 'Chung' }).eq("id", id).select()
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     return NextResponse.json(data)
   } catch (err: any) {

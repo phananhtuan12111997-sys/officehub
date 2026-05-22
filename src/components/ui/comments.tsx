@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Loader2, Send, ThumbsUp, X } from "lucide-react"
+import { EmojiReactions } from "@/components/ui/emoji-reactions"
 
 type Reaction = {
   id: string
@@ -80,6 +81,106 @@ export function Comments({ postId, taskId }: { postId?: string, taskId?: string 
       setNewComment("")
       setReplyTo(null)
       await fetchComments()
+      
+      // Send notification to post/task author
+      if (postId || taskId) {
+        // Try to find the author of the post or task
+        let targetUserId = null;
+        let notifLink = '';
+        
+        if (postId) {
+          const { data: post } = await supabase.from('posts').select('author_id').eq('id', postId).single()
+          targetUserId = post?.author_id
+          notifLink = `/post/${postId}`
+        } else if (taskId) {
+          const { data: task } = await supabase.from('tasks').select('assignee_id, creator_id').eq('id', taskId).single()
+          // For tasks, notify creator or assignee depending on who is commenting
+          targetUserId = task?.creator_id === user.id ? task?.assignee_id : task?.creator_id
+          notifLink = `/tasks`
+        }
+
+        if (targetUserId && targetUserId !== user.id) {
+          const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single()
+          const actorName = profile?.full_name || 'Ai đó'
+          
+          // Get total comments for this post
+          const { count: totalComments } = await supabase.from('comments').select('id', { count: 'exact' }).eq(postId ? 'post_id' : 'task_id', postId || taskId)
+          
+          let message = `${actorName} đã bình luận: "${newComment.trim().substring(0, 50)}${newComment.length > 50 ? '...' : ''}"`
+          if (totalComments && totalComments > 1) {
+             message = `${actorName} và ${totalComments - 1} người khác đã bình luận về bài viết của bạn.`
+          }
+
+          const { data: existingNotif } = await supabase
+            .from('notifications')
+            .select('id')
+            .eq('user_id', targetUserId)
+            .eq('type', 'comment')
+            .eq('link', notifLink)
+            .maybeSingle()
+
+          if (existingNotif) {
+            await supabase.from('notifications')
+              .update({
+                message,
+                title: 'Bình luận mới',
+                is_read: false,
+                created_at: new Date().toISOString()
+              })
+              .eq('id', existingNotif.id)
+          } else {
+            await supabase.from('notifications').insert({
+              user_id: targetUserId,
+              title: 'Bình luận mới',
+              message,
+              type: 'comment',
+              link: notifLink
+            })
+          }
+        }
+        
+        // Also notify the parent comment author if it's a reply
+        if (replyTo && replyTo.author_id !== user.id && replyTo.author_id !== targetUserId) {
+          const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single()
+          const actorName = profile?.full_name || 'Ai đó'
+          const replyLink = `${notifLink}#comment-${replyTo.id}`
+          
+          // Count replies to this specific comment
+          const { count: totalReplies } = await supabase.from('comments').select('id', { count: 'exact' }).eq('parent_id', replyTo.id)
+          
+          let replyMessage = `${actorName} đã trả lời bình luận của bạn.`
+          if (totalReplies && totalReplies > 1) {
+             replyMessage = `${actorName} và ${totalReplies - 1} người khác đã trả lời bình luận của bạn.`
+          }
+
+          const { data: existingReplyNotif } = await supabase
+            .from('notifications')
+            .select('id')
+            .eq('user_id', replyTo.author_id)
+            .eq('type', 'comment')
+            .eq('link', replyLink)
+            .maybeSingle()
+
+          if (existingReplyNotif) {
+            await supabase.from('notifications')
+              .update({
+                message: replyMessage,
+                title: 'Có người phản hồi bình luận',
+                is_read: false,
+                created_at: new Date().toISOString()
+              })
+              .eq('id', existingReplyNotif.id)
+          } else {
+            await supabase.from('notifications').insert({
+              user_id: replyTo.author_id,
+              title: 'Có người phản hồi bình luận',
+              message: replyMessage,
+              type: 'comment',
+              link: replyLink
+            })
+          }
+        }
+      }
     } else {
       alert("Lỗi đăng bình luận: " + error.message)
     }
@@ -89,10 +190,13 @@ export function Comments({ postId, taskId }: { postId?: string, taskId?: string 
   const toggleReaction = async (commentId: string, reactionType: string = 'like') => {
     if (!user) return
     const comment = comments.find(c => c.id === commentId)
-    const existing = comment?.comment_reactions?.find(r => r.user_id === user.id && r.reaction_type === reactionType)
+    // Find if the user has ANY reaction to this comment
+    const existing = comment?.comment_reactions?.find(r => r.user_id === user.id)
 
-    if (existing) {
+    if (existing && existing.reaction_type === reactionType) {
       await supabase.from('comment_reactions').delete().eq('id', existing.id)
+    } else if (existing) {
+      await supabase.from('comment_reactions').update({ reaction_type: reactionType }).eq('id', existing.id)
     } else {
       await supabase.from('comment_reactions').insert({
         comment_id: commentId,
@@ -103,10 +207,14 @@ export function Comments({ postId, taskId }: { postId?: string, taskId?: string 
       if (comment && comment.author_id !== user.id) {
         const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single()
         const notifLink = postId ? `/post/${postId}` : (taskId ? `/tasks` : `/`)
+        
+        const reactionLabels: Record<string, string> = { like: 'thích', love: 'yêu thích', haha: 'cười haha', wow: 'wow', sad: 'buồn', angry: 'phẫn nộ' }
+        const label = reactionLabels[reactionType] || 'thích'
+        
         await supabase.from('notifications').insert({
           user_id: comment.author_id,
-          title: 'Có người thích bình luận',
-          message: `${profile?.full_name || 'Ai đó'} đã thích bình luận của bạn.`,
+          title: 'Có người bày tỏ cảm xúc bình luận',
+          message: `${profile?.full_name || 'Ai đó'} đã bày tỏ cảm xúc ${label} với bình luận của bạn.`,
           type: 'reaction',
           link: notifLink
         })
@@ -133,20 +241,14 @@ export function Comments({ postId, taskId }: { postId?: string, taskId?: string 
           <div className="flex flex-col bg-muted/50 rounded-2xl px-3 py-2 text-sm w-fit max-w-[90%] relative">
             <span className="font-semibold text-foreground/90">{comment.profiles?.full_name || "Người dùng"}</span>
             <p className="mt-0.5 whitespace-pre-wrap">{comment.content}</p>
-            {likes > 0 && (
-              <div className="absolute -bottom-2 -right-4 bg-background border shadow-sm rounded-full px-1.5 py-0.5 text-[10px] flex items-center gap-1 z-10">
-                <ThumbsUp className="w-3 h-3 text-blue-500 fill-blue-500" /> <span className="font-semibold text-muted-foreground">{likes}</span>
-              </div>
-            )}
           </div>
           <div className="flex items-center gap-3 mt-1 ml-2 text-xs text-muted-foreground">
-            <button 
-              type="button"
-              onClick={() => toggleReaction(comment.id, 'like')} 
-              className={`hover:underline font-semibold ${hasLiked ? 'text-primary' : ''}`}
-            >
-              Thích
-            </button>
+            <EmojiReactions 
+              postId={comment.id}
+              reactions={comment.comment_reactions || []}
+              currentUserId={user?.id}
+              onReact={toggleReaction}
+            />
             <button 
               type="button"
               onClick={() => { 

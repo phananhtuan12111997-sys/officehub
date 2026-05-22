@@ -33,7 +33,8 @@ type TaskType = {
 }
 
 const COLUMNS = [
-  { id: 'new', title: "Việc mới / Đang làm" },
+  { id: 'new', title: "Việc mới" },
+  { id: 'in-progress', title: "Đang thực hiện" },
   { id: 'review', title: "Chờ duyệt" },
   { id: 'done', title: "Hoàn thành" }
 ]
@@ -239,6 +240,36 @@ export default function TasksPage() {
 
     setIsUpdating(false)
     if (!error) {
+      if (editTaskData.assignee_id && editTaskData.assignee_id !== selectedTask.assignee_id) {
+        const { data: { session } } = await supabase.auth.getSession()
+        const senderProfile = users.find(u => u.id === session?.user.id)
+        const senderName = senderProfile ? senderProfile.full_name : 'Ai đó'
+
+        await supabase.from('notifications').insert({
+          user_id: editTaskData.assignee_id,
+          title: 'Công việc được cập nhật',
+          message: `${senderName} vừa giao cho bạn một công việc: ${editTaskData.title}`,
+          link: `/tasks`,
+          type: 'system'
+        })
+      } else if (editTaskData.department_id && editTaskData.department_id !== selectedTask.department_id) {
+        const { data: { session } } = await supabase.auth.getSession()
+        const senderProfile = users.find(u => u.id === session?.user.id)
+        const senderName = senderProfile ? senderProfile.full_name : 'Ai đó'
+
+        const deptUsers = users.filter(u => u.department_id === editTaskData.department_id)
+        const notifications = deptUsers.map(u => ({
+          user_id: u.id,
+          title: 'Công việc mới cho phòng ban',
+          message: `${senderName} vừa giao việc cho phòng ${selectedDept?.name}: ${editTaskData.title}`,
+          link: `/tasks`,
+          type: 'system'
+        }))
+        if (notifications.length > 0) {
+          await supabase.from('notifications').insert(notifications)
+        }
+      }
+
       setIsEditingTask(false)
       setSelectedTask({
         ...selectedTask,
@@ -268,8 +299,9 @@ export default function TasksPage() {
   }
 
   const handleMoveTask = async (id: string, currentStatus: string) => {
-    let nextStatus = 'new'
-    if (currentStatus === 'new' || currentStatus === 'in-progress') nextStatus = 'review'
+    let nextStatus = 'in-progress'
+    if (currentStatus === 'new') nextStatus = 'in-progress'
+    else if (currentStatus === 'in-progress') nextStatus = 'review'
     else if (currentStatus === 'review') nextStatus = 'done'
     else if (currentStatus === 'done') nextStatus = 'new'
 
@@ -299,6 +331,10 @@ export default function TasksPage() {
     }
   }
 
+  const currentUserProfile = users.find(u => u.id === currentUserId)
+  const isAdmin = currentUserProfile?.role === 'admin'
+  const currentUserDepartmentId = currentUserProfile?.department_id
+
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto h-[calc(100vh-8rem)]">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -306,10 +342,12 @@ export default function TasksPage() {
           <h1 className="text-2xl font-bold tracking-tight">Công việc</h1>
           <p className="text-muted-foreground">Theo dõi và giao việc cá nhân, phòng ban.</p>
         </div>
-        <Button onClick={() => setShowForm(!showForm)} className="flex items-center gap-2">
-          <Plus className="w-4 h-4" />
-          {showForm ? "Đóng" : "Giao việc mới"}
-        </Button>
+        {isAdmin && (
+          <Button onClick={() => setShowForm(!showForm)} className="flex items-center gap-2">
+            <Plus className="w-4 h-4" />
+            {showForm ? "Đóng" : "Giao việc mới"}
+          </Button>
+        )}
       </div>
 
       {showForm && (
@@ -509,10 +547,11 @@ export default function TasksPage() {
       ) : (
         <div className="flex gap-6 overflow-x-auto pb-4 h-full">
           {COLUMNS.map((col) => {
-            const colTasks = tasks.filter(t => 
-              (col.id === 'new' && (t.status === 'new' || t.status === 'in-progress')) ||
-              t.status === col.id
-            )
+            const visibleTasks = tasks.filter(t => {
+              if (isAdmin) return true
+              return t.assignee_id === currentUserId || (t.department_id && t.department_id === currentUserDepartmentId)
+            })
+            const colTasks = visibleTasks.filter(t => t.status === col.id)
             
             return (
               <div key={col.id} className="min-w-[320px] w-[350px] flex flex-col gap-4">
@@ -592,7 +631,7 @@ export default function TasksPage() {
                 <Badge variant="outline" className={getPriorityColor(selectedTask?.priority || "medium")}>
                   Ưu tiên {getPriorityLabel(selectedTask?.priority || "medium")}
                 </Badge>
-                <Badge variant="secondary">{COLUMNS.find(c => c.id === (selectedTask?.status === 'in-progress' ? 'new' : selectedTask?.status))?.title}</Badge>
+                <Badge variant="secondary">{COLUMNS.find(c => c.id === selectedTask?.status)?.title}</Badge>
               </div>
               <div className="flex items-center gap-1">
                 {!isEditingTask && selectedTask && (

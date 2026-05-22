@@ -18,6 +18,8 @@ import {
 } from "lucide-react"
 import { supabase } from "@/lib/supabase/client"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 type DocumentType = {
   id: string
@@ -33,6 +35,7 @@ type DocumentType = {
 type FolderType = {
   id: string
   name: string
+  department?: string
   created_at: string
 }
 
@@ -40,6 +43,8 @@ export default function DocumentsPage() {
   const [files, setFiles] = useState<DocumentType[]>([])
   const [folders, setFolders] = useState<FolderType[]>([])
   const [currentFolder, setCurrentFolder] = useState<FolderType | null>(null)
+  const [departments, setDepartments] = useState<{id: string, name: string}[]>([])
+  const [filterDept, setFilterDept] = useState("all")
   
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
@@ -49,6 +54,7 @@ export default function DocumentsPage() {
   // Create Folder State
   const [isFolderDialogOpen, setIsFolderDialogOpen] = useState(false)
   const [newFolderName, setNewFolderName] = useState("")
+  const [newFolderDepartment, setNewFolderDepartment] = useState("Chung")
   const [creatingFolder, setCreatingFolder] = useState(false)
 
   // Preview State
@@ -63,24 +69,31 @@ export default function DocumentsPage() {
   const [editName, setEditName] = useState("")
   const [isSavingEdit, setIsSavingEdit] = useState(false)
 
-  // Edit Folder State
   const [editingFolder, setEditingFolder] = useState<FolderType | null>(null)
   const [editFolderName, setEditFolderName] = useState("")
+  const [editFolderDepartment, setEditFolderDepartment] = useState("Chung")
   const [isSavingFolderEdit, setIsSavingFolderEdit] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   
   useEffect(() => {
     checkAdmin()
-    fetchData()
-  }, [currentFolder])
+    fetchDepartments()
+  }, [])
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       fetchData()
     }, 500)
     return () => clearTimeout(delayDebounceFn)
-  }, [searchQuery])
+  }, [searchQuery, currentFolder, filterDept])
+
+  const fetchDepartments = async () => {
+    const { data } = await supabase.from("departments").select("id, name").order("name")
+    if (data) setDepartments(data)
+  }
+
+
 
   const checkAdmin = async () => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -169,7 +182,7 @@ export default function DocumentsPage() {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${session.access_token}`
       },
-      body: JSON.stringify({ name: newFolderName.trim() })
+      body: JSON.stringify({ name: newFolderName.trim(), department: newFolderDepartment })
     })
 
     if (!res.ok) {
@@ -177,6 +190,7 @@ export default function DocumentsPage() {
       alert("Lỗi tạo thư mục: " + (error.error || "Không thể tạo"))
     } else {
       setNewFolderName("")
+      setNewFolderDepartment("Chung")
       setIsFolderDialogOpen(false)
       fetchData()
     }
@@ -234,7 +248,7 @@ export default function DocumentsPage() {
             name: file.name,
             file_url: publicUrl,
             size: formatBytes(file.size),
-            department: "Chung",
+            department: currentFolder ? (currentFolder.department || "Chung") : "Chung",
             folder_id: currentFolder ? currentFolder.id : null,
             uploaded_by: currentUserId
           })
@@ -318,6 +332,7 @@ export default function DocumentsPage() {
   const handleEditFolder = (folder: FolderType) => {
     setEditingFolder(folder)
     setEditFolderName(folder.name)
+    setEditFolderDepartment(folder.department || "Chung")
   }
 
   const saveEditFolder = async (e: React.FormEvent) => {
@@ -333,7 +348,7 @@ export default function DocumentsPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session.access_token}`
         },
-        body: JSON.stringify({ id: editingFolder.id, name: editFolderName.trim() })
+        body: JSON.stringify({ id: editingFolder.id, name: editFolderName.trim(), department: editFolderDepartment })
       })
 
       if (!res.ok) {
@@ -425,43 +440,63 @@ export default function DocumentsPage() {
         </div>
       </div>
 
-      {/* Breadcrumb & Search */}
-      <div className="flex flex-col sm:flex-row items-center justify-between bg-card p-4 rounded-xl border shadow-sm gap-4">
-        <div className="flex items-center gap-2 flex-1">
-          {currentFolder ? (
-            <Button variant="ghost" size="sm" onClick={() => { setCurrentFolder(null); setSearchQuery(""); }} className="px-2">
-              <ChevronLeft className="w-4 h-4 mr-1" />
-              Quay lại
-            </Button>
-          ) : isSearching ? (
-            <Badge variant="secondary" className="px-3 py-1 text-sm font-normal">
-              Kết quả tìm kiếm cho: "{searchQuery}"
-            </Badge>
-          ) : (
-            <Badge variant="secondary" className="px-3 py-1 text-sm font-normal">
-              Thư mục gốc
-            </Badge>
-          )}
-          
-          {currentFolder && !isSearching && (
-            <Badge variant="secondary" className="px-3 py-1 text-sm font-normal flex items-center gap-1">
-              <FolderIcon className="w-3 h-3 text-yellow-500" />
-              {currentFolder.name}
-            </Badge>
-          )}
-        </div>
-
-        <div className="relative w-full sm:w-80">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+      {/* Filters & Search */}
+      <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-2 bg-background border rounded-xl p-2 shadow-sm">
+        <Tabs defaultValue="all" value={filterDept} onValueChange={(val) => {
+          setFilterDept(val)
+          setCurrentFolder(null)
+          setSearchQuery("")
+        }} className="w-full md:w-auto">
+          <TabsList className="flex flex-wrap h-auto w-full justify-start bg-transparent">
+            <TabsTrigger value="all" className="data-active:bg-primary data-active:text-primary-foreground rounded-full px-4">Tất cả</TabsTrigger>
+            <TabsTrigger value="Chung" className="data-active:bg-primary data-active:text-primary-foreground rounded-full px-4">Chung</TabsTrigger>
+            {departments.map(d => (
+              <TabsTrigger key={d.id} value={d.name} className="data-active:bg-primary data-active:text-primary-foreground rounded-full px-4">Phòng {d.name}</TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        <div className="relative w-full md:w-72">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
             type="search" 
             placeholder="Tìm kiếm tài liệu..." 
-            className="pl-8 bg-muted/50"
+            className="pl-9 bg-muted/40 border-none rounded-full" 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
       </div>
+
+      {/* Breadcrumb */}
+      {(currentFolder || isSearching) && (
+        <div className="flex flex-col sm:flex-row items-center justify-between bg-card p-4 rounded-xl border shadow-sm gap-4 mb-4">
+          <div className="flex items-center gap-2 flex-1">
+            {currentFolder ? (
+              <Button variant="ghost" size="sm" onClick={() => { setCurrentFolder(null); setSearchQuery(""); }} className="px-2">
+                <ChevronLeft className="w-4 h-4 mr-1" />
+                Quay lại
+              </Button>
+            ) : isSearching ? (
+              <Badge variant="secondary" className="px-3 py-1 text-sm font-normal">
+                Kết quả tìm kiếm cho: "{searchQuery}"
+              </Badge>
+            ) : null}
+            
+            {currentFolder && !isSearching && (
+              <Badge variant="secondary" className="px-3 py-1 text-sm font-normal flex items-center gap-1">
+                <FolderIcon className="w-3 h-3 text-yellow-500" />
+                {currentFolder.name}
+              </Badge>
+            )}
+            
+            {currentFolder && !isSearching && (
+              <Badge variant="secondary" className="ml-2 font-normal">
+                Phòng ban: {currentFolder.department || "Chung"}
+              </Badge>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="border rounded-xl bg-card shadow-sm overflow-hidden">
         <Table>
@@ -490,7 +525,9 @@ export default function DocumentsPage() {
             ) : (
               <>
                 {/* Render Folders (only if not searching and no current folder) */}
-                {!isSearching && !currentFolder && folders.map((folder) => (
+                {!isSearching && !currentFolder && folders
+                  .filter(f => filterDept === "all" ? true : (f.department || "Chung") === filterDept)
+                  .map((folder) => (
                   <TableRow 
                     key={folder.id} 
                     className="cursor-pointer hover:bg-muted/50 transition-colors"
@@ -503,7 +540,7 @@ export default function DocumentsPage() {
                       {folder.name}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">Thư mục</Badge>
+                      <Badge variant="secondary" className="font-normal">{folder.department || "Chung"}</Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {new Date(folder.created_at).toLocaleDateString('vi-VN')}
@@ -521,7 +558,9 @@ export default function DocumentsPage() {
                 ))}
 
                 {/* Render Files */}
-                {files.map((file) => (
+                {files
+                  .filter(f => filterDept === "all" || currentFolder ? true : (f.department || "Chung") === filterDept)
+                  .map((file) => (
                   <TableRow key={file.id} className="hover:bg-muted/30">
                     <TableCell className="font-medium flex items-center gap-3 cursor-pointer" onClick={() => setPreviewFile(file)}>
                       <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg">
@@ -599,12 +638,27 @@ export default function DocumentsPage() {
           </DialogHeader>
           <form onSubmit={handleCreateFolder} className="space-y-4 py-4">
             <div className="space-y-2">
+              <label className="text-sm font-medium">Tên thư mục</label>
               <Input 
                 placeholder="Nhập tên thư mục..." 
                 value={newFolderName}
                 onChange={(e) => setNewFolderName(e.target.value)}
                 autoFocus
               />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Phòng ban (Phân loại theo bộ phận)</label>
+              <Select value={newFolderDepartment} onValueChange={(val) => setNewFolderDepartment(val || "Chung")}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Chọn phòng ban" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Chung">Chung (Tất cả phòng ban)</SelectItem>
+                  {departments.map((dept) => (
+                    <SelectItem key={dept.id} value={dept.name}>Phòng {dept.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsFolderDialogOpen(false)}>Hủy</Button>
@@ -619,34 +673,80 @@ export default function DocumentsPage() {
 
       {/* File Preview Dialog */}
       <Dialog open={!!previewFile} onOpenChange={(open) => !open && setPreviewFile(null)}>
-        <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
-          <DialogHeader className="p-4 border-b bg-muted/30 flex-shrink-0">
-            <DialogTitle className="flex items-center justify-between mr-6">
-              <div className="flex items-center gap-2 truncate">
-                {previewFile && getFileIcon(previewFile.name)}
-                <span className="truncate">{previewFile?.name}</span>
+        {previewFile && (
+          <DialogContent className="sm:max-w-4xl w-[95vw] p-0 overflow-hidden flex flex-col gap-0 border-primary/20 shadow-xl h-[90vh] sm:h-auto max-h-[95vh]">
+            <DialogHeader className="p-4 border-b bg-muted/30 flex flex-row items-center justify-between space-y-0">
+              <div className="flex items-center gap-3 overflow-hidden pr-8">
+                <div className="p-1.5 bg-primary/10 rounded text-primary">
+                  {getFileIcon(previewFile.name)}
+                </div>
+                <DialogTitle className="truncate font-semibold text-base">{previewFile.name}</DialogTitle>
               </div>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={(e) => previewFile && handleDownload(e, previewFile.file_url)}
-                className="ml-4 shrink-0"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Tải xuống
-              </Button>
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 w-full bg-slate-100 dark:bg-slate-900 relative">
-            {previewFile && (
-              <iframe 
-                src={getFileViewerUrl(previewFile.file_url, previewFile.name)}
-                className="absolute inset-0 w-full h-full border-0"
-                title="File Preview"
-              />
-            )}
-          </div>
-        </DialogContent>
+              <div className="flex items-center gap-2">
+                <a 
+                  href={previewFile.file_url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  download
+                >
+                  <Button size="sm" variant="outline" className="gap-2 hidden sm:flex">
+                    <Download className="h-4 w-4" /> Tải xuống
+                  </Button>
+                  <Button size="icon" variant="outline" className="sm:hidden h-8 w-8">
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </a>
+              </div>
+            </DialogHeader>
+            <div className="flex-1 overflow-auto p-4 bg-background relative">
+              {(() => {
+                const ext = previewFile.name.split('.').pop()?.toLowerCase() || "";
+                
+                // Hình ảnh
+                if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
+                  return (
+                    <div className="flex items-center justify-center bg-black/5 rounded-md p-4 min-h-[50vh]">
+                      <img src={previewFile.file_url} alt={previewFile.name} className="max-w-full max-h-[70vh] object-contain rounded-md shadow-sm" />
+                    </div>
+                  )
+                }
+                
+                // PDF
+                if (ext === 'pdf') {
+                  return (
+                    <div className="w-full h-[75vh] rounded-md overflow-hidden border">
+                      <iframe src={previewFile.file_url} className="w-full h-full" title={previewFile.name} />
+                    </div>
+                  )
+                }
+                
+                // Office files (Word, Excel, PowerPoint)
+                if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) {
+                  const officeViewerUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(previewFile.file_url)}`
+                  return (
+                    <div className="w-full h-[75vh] rounded-md overflow-hidden border">
+                      <iframe src={officeViewerUrl} className="w-full h-full" title={previewFile.name} />
+                    </div>
+                  )
+                }
+
+                // Các loại file khác không hỗ trợ xem trước
+                return (
+                  <div className="flex flex-col items-center justify-center py-20 text-center gap-4 bg-muted/20 rounded-md border border-dashed">
+                    <FileIcon className="h-16 w-16 text-muted-foreground/50" />
+                    <div>
+                      <p className="font-medium text-lg">Không thể xem trước định dạng file này</p>
+                      <p className="text-muted-foreground text-sm mt-1">Vui lòng tải xuống để xem nội dung.</p>
+                    </div>
+                    <a href={previewFile.file_url} download target="_blank" rel="noopener noreferrer">
+                      <Button>Tải xuống ngay</Button>
+                    </a>
+                  </div>
+                )
+              })()}
+            </div>
+          </DialogContent>
+        )}
       </Dialog>
 
       {/* Edit File Dialog */}
@@ -683,12 +783,27 @@ export default function DocumentsPage() {
           </DialogHeader>
           <form onSubmit={saveEditFolder} className="space-y-4 py-4">
             <div className="space-y-2">
+              <label className="text-sm font-medium">Tên thư mục</label>
               <Input 
                 placeholder="Tên thư mục mới..." 
                 value={editFolderName}
                 onChange={(e) => setEditFolderName(e.target.value)}
                 autoFocus
               />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Phòng ban (Phân loại theo bộ phận)</label>
+              <Select value={editFolderDepartment} onValueChange={(val) => setEditFolderDepartment(val || "Chung")}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Chọn phòng ban" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Chung">Chung</SelectItem>
+                  {departments.map(d => (
+                    <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setEditingFolder(null)}>Hủy</Button>

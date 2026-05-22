@@ -128,3 +128,30 @@
     @apply font-sans;
   }
 }
+
+.ql-container {
+  background-color: var(--muted); /* Gray background for the workspace */
+  border-bottom-left-radius: var(--radius);
+  border-bottom-right-radius: var(--radius);
+}
+
+.ql-editor {
+  min-height: 250px;
+  max-height: 500px;
+  overflow-y: auto;
+  width: 100%;
+  max-width: 100%; /* Ensure it doesn't exceed modal width */
+  margin: 0 auto; 
+  background-color: var(--background); 
+  border-radius: 4px;
+  padding: 1rem !important; 
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+/* Ensure images don't overflow the Word page */
+.ql-editor img {
+  max-width: 100%;
+  height: auto;
+}

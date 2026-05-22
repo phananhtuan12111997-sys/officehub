@@ -18,18 +18,20 @@ export async function PATCH(req: Request) {
     }
 
     const body = await req.json()
-    const { id, title, content, department, attachments } = body
+    const { id, title, content, department, attachments, is_pinned } = body
 
-    if (!id || !title || !content) return NextResponse.json({ error: "Missing fields" }, { status: 400 })
+    if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 })
+
+    const updateData: any = {}
+    if (title !== undefined) updateData.title = title
+    if (content !== undefined) updateData.content = content
+    if (department !== undefined) updateData.department = department
+    if (attachments !== undefined) updateData.attachments = attachments
+    if (is_pinned !== undefined) updateData.is_pinned = is_pinned
 
     const { data, error } = await supabaseAdmin
       .from("posts")
-      .update({
-        title,
-        content,
-        department,
-        attachments: attachments || []
-      })
+      .update(updateData)
       .eq("id", id)
       .select()
 
