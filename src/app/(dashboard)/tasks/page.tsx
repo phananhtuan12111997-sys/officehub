@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Clock, Plus, ArrowRight, Loader2, MessageSquare } from "lucide-react"
 import { supabase } from "@/lib/supabase/client"
 import { Comments } from "@/components/ui/comments"
@@ -32,8 +33,14 @@ export default function TasksPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   
   const [title, setTitle] = useState("")
-  const [assignee, setAssignee] = useState("")
+  const [assigneeId, setAssigneeId] = useState("")
   const [dueDate, setDueDate] = useState("")
+  const [users, setUsers] = useState<any[]>([])
+
+  const fetchUsers = async () => {
+    const { data } = await supabase.from('profiles').select('*')
+    if (data) setUsers(data)
+  }
 
   const fetchTasks = async () => {
     setLoading(true)
@@ -48,6 +55,7 @@ export default function TasksPage() {
 
   useEffect(() => {
     fetchTasks()
+    fetchUsers()
   }, [])
 
   const handleCreateTask = async (e: React.FormEvent) => {
@@ -55,11 +63,13 @@ export default function TasksPage() {
     if (!title) return
     setIsSubmitting(true)
     
+    const selectedUser = users.find(u => u.id === assigneeId)
     const { error } = await supabase
       .from('tasks')
       .insert({
         title,
-        assignee: assignee || "Chưa phân công",
+        assignee: selectedUser ? selectedUser.full_name : "Chưa phân công",
+        assignee_id: assigneeId || null,
         due_date: dueDate || "Không có hạn",
         status: 'new'
       })
@@ -68,7 +78,7 @@ export default function TasksPage() {
       alert("Lỗi giao việc: " + error.message)
     } else {
       setTitle("")
-      setAssignee("")
+      setAssigneeId("")
       setDueDate("")
       setShowForm(false)
       fetchTasks()
@@ -124,11 +134,16 @@ export default function TasksPage() {
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium">Người nhận</label>
-                  <Input 
-                    placeholder="Vd: Nhân viên A..." 
-                    value={assignee}
-                    onChange={(e) => setAssignee(e.target.value)}
-                  />
+                  <Select value={assigneeId} onValueChange={setAssigneeId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Chọn người nhận" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {users.map(u => (
+                        <SelectItem key={u.id} value={u.id}>{u.full_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium">Hạn chót</label>

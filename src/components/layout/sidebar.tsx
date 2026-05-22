@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { FileText, Home, CheckSquare, Users, ShieldAlert } from "lucide-react"
+import { FileText, Home, CheckSquare, Users, ShieldAlert, Mail } from "lucide-react"
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase/client"
 
@@ -57,6 +57,13 @@ export function Sidebar() {
           >
             <CheckSquare className="h-4 w-4" />
             <span className="hidden md:block">Công việc</span>
+          </Link>
+          <Link
+            href="/inbox"
+            className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all ${pathname.startsWith("/inbox") ? "bg-primary-foreground/20 text-white font-semibold" : "text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10"}`}
+          >
+            <Mail className="h-4 w-4" />
+            <span className="hidden md:block">Hộp thư</span>
           </Link>
 
           {isAdmin && (

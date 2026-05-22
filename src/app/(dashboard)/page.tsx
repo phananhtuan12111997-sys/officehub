@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { supabase } from "@/lib/supabase/client"
-import { Loader2, ArrowRight, Paperclip, Edit2 } from "lucide-react"
+import { Loader2, ArrowRight, Paperclip, Edit2, Trash2 } from "lucide-react"
 import { FileUpload, Attachment } from "@/components/ui/file-upload"
 import Link from "next/link"
 
@@ -69,22 +69,30 @@ export default function FeedPage() {
 
     setIsSubmitting(true)
     
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+    const user = session.user
     const authorName = user?.email?.split('@')[0] || "Người dùng"
 
     if (editingPostId) {
-      const { error } = await supabase
-        .from('posts')
-        .update({
+      const res = await fetch('/api/posts', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          id: editingPostId,
           title,
           content,
           department,
           attachments: attachments.length > 0 ? attachments : []
         })
-        .eq('id', editingPostId)
+      })
 
-      if (error) {
-        alert("Lỗi sửa bài: " + error.message)
+      if (!res.ok) {
+        const errorData = await res.json()
+        alert("Lỗi sửa bài: " + (errorData.error || "Không xác định"))
       } else {
         resetForm()
         await fetchPosts()
@@ -127,6 +135,25 @@ export default function FeedPage() {
     setEditingPostId(post.id)
     setShowForm(true)
     window.scrollTo({ top: 0, behavior: "smooth" })
+  }
+
+  const handleDeletePost = async (id: string) => {
+    if (!confirm("Bạn có chắc muốn xoá bản tin này?")) return
+
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+
+    const res = await fetch(`/api/posts?id=${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${session.access_token}` }
+    })
+
+    if (!res.ok) {
+      const errorData = await res.json()
+      alert("Lỗi xoá bài: " + (errorData.error || "Không xác định"))
+    } else {
+      await fetchPosts()
+    }
   }
 
   return (
@@ -227,9 +254,14 @@ export default function FeedPage() {
                       {new Date(post.created_at).toLocaleDateString('vi-VN')}
                     </span>
                     {isAdmin && (
-                      <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={() => handleEditPost(post)} title="Sửa thông báo">
-                        <Edit2 className="h-3 w-3" />
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={() => handleEditPost(post)} title="Sửa thông báo">
+                          <Edit2 className="h-3 w-3" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => handleDeletePost(post.id)} title="Xoá thông báo">
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </div>

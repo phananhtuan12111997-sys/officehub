@@ -63,6 +63,11 @@ export default function DocumentsPage() {
   const [editName, setEditName] = useState("")
   const [isSavingEdit, setIsSavingEdit] = useState(false)
 
+  // Edit Folder State
+  const [editingFolder, setEditingFolder] = useState<FolderType | null>(null)
+  const [editFolderName, setEditFolderName] = useState("")
+  const [isSavingFolderEdit, setIsSavingFolderEdit] = useState(false)
+
   const fileInputRef = useRef<HTMLInputElement>(null)
   
   useEffect(() => {
@@ -310,6 +315,57 @@ export default function DocumentsPage() {
     setIsSavingEdit(false)
   }
 
+  const handleEditFolder = (folder: FolderType) => {
+    setEditingFolder(folder)
+    setEditFolderName(folder.name)
+  }
+
+  const saveEditFolder = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingFolder || !editFolderName.trim()) return
+
+    setIsSavingFolderEdit(true)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) {
+      const res = await fetch('/api/documents/folders', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ id: editingFolder.id, name: editFolderName.trim() })
+      })
+
+      if (!res.ok) {
+        const errorData = await res.json()
+        alert("Lỗi: " + errorData.error)
+      } else {
+        setEditingFolder(null)
+        fetchData()
+      }
+    }
+    setIsSavingFolderEdit(false)
+  }
+
+  const handleDeleteFolder = async (id: string) => {
+    if (!confirm("Bạn có chắc muốn xóa thư mục này? LƯU Ý: Bạn cần phải xóa hoặc di chuyển toàn bộ tài liệu bên trong trước khi xóa!")) return
+
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+
+    const res = await fetch(`/api/documents/folders?id=${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${session.access_token}` }
+    })
+
+    if (!res.ok) {
+      const errorData = await res.json()
+      alert("Lỗi: " + errorData.error)
+    } else {
+      fetchData()
+    }
+  }
+
   const getFileIcon = (fileName: string) => {
     const ext = fileName.split('.').pop()?.toLowerCase();
     switch (ext) {
@@ -453,7 +509,14 @@ export default function DocumentsPage() {
                       {new Date(folder.created_at).toLocaleDateString('vi-VN')}
                     </TableCell>
                     <TableCell className="text-muted-foreground">-</TableCell>
-                    <TableCell></TableCell>
+                    <TableCell className="text-right">
+                      {isAdmin && (
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEditFolder(folder); }} className="text-muted-foreground hover:text-primary"><Edit2 className="w-4 h-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder.id); }} className="text-muted-foreground hover:text-destructive"><Trash2 className="w-4 h-4" /></Button>
+                        </div>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
 
@@ -605,6 +668,32 @@ export default function DocumentsPage() {
               <Button type="button" variant="outline" onClick={() => setEditingFile(null)}>Hủy</Button>
               <Button type="submit" disabled={isSavingEdit || !editName.trim()}>
                 {isSavingEdit && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Lưu thay đổi
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Folder Dialog */}
+      <Dialog open={!!editingFolder} onOpenChange={(open) => !open && setEditingFolder(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Đổi tên thư mục</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={saveEditFolder} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Input 
+                placeholder="Tên thư mục mới..." 
+                value={editFolderName}
+                onChange={(e) => setEditFolderName(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditingFolder(null)}>Hủy</Button>
+              <Button type="submit" disabled={isSavingFolderEdit || !editFolderName.trim()}>
+                {isSavingFolderEdit && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Lưu thay đổi
               </Button>
             </DialogFooter>

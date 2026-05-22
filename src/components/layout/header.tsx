@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useState, useRef } from "react"
-import { Menu, Search, User, FileText, CheckSquare, Loader2 } from "lucide-react"
+import { Menu, Search, User, FileText, CheckSquare, Loader2, Bell } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -28,6 +28,56 @@ export function Header() {
   const [suggestions, setSuggestions] = useState<{posts: any[], tasks: any[]}>({ posts: [], tasks: [] })
   const [isLoading, setIsLoading] = useState(false)
   const wrapperRef = useRef<HTMLDivElement>(null)
+
+  // Notifications state
+  const [notifications, setNotifications] = useState<any[]>([])
+  const [unreadCount, setUnreadCount] = useState(0)
+
+  const fetchNotifications = async (userId: string) => {
+    const { data } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(20)
+    
+    if (data) {
+      setNotifications(data)
+      setUnreadCount(data.filter(n => !n.is_read).length)
+    }
+  }
+
+  const handleReadNotification = async (notification: any) => {
+    if (!notification.is_read) {
+      await supabase.from('notifications').update({ is_read: true }).eq('id', notification.id)
+      setUnreadCount(prev => Math.max(0, prev - 1))
+      setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n))
+    }
+    if (notification.link) {
+      router.push(notification.link)
+    }
+  }
+
+  // Subscribe to real-time notifications + polling
+  useEffect(() => {
+    if (!profile) return
+    
+    // Polling as fallback (every 10s)
+    const interval = setInterval(() => {
+      fetchNotifications(profile.id)
+    }, 10000)
+
+    const channel = supabase.channel('notifications')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${profile.id}` }, (payload) => {
+        fetchNotifications(profile.id)
+      })
+      .subscribe()
+      
+    return () => {
+      clearInterval(interval)
+      supabase.removeChannel(channel)
+    }
+  }, [profile])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -100,7 +150,10 @@ export function Header() {
           .eq("id", data.session.user.id)
           .single()
           .then(({ data: p }) => {
-            if (p) setProfile(p)
+            if (p) {
+              setProfile(p)
+              fetchNotifications(data.session.user.id)
+            }
           })
       }
     })
@@ -231,7 +284,57 @@ export function Header() {
       </div>
 
       {/* User Menu */}
-      <div className="flex items-center gap-4 sm:ml-auto md:ml-auto">
+      <div className="flex items-center gap-2 sm:gap-4 sm:ml-auto md:ml-auto">
+        {/* Notification Bell */}
+        <DropdownMenu>
+          <DropdownMenuTrigger className="relative inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-primary-foreground/10 hover:text-white h-9 w-9 text-primary-foreground">
+            <Bell className="h-5 w-5" />
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white shadow-sm ring-1 ring-white">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-80 p-0">
+            <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
+              <span className="font-semibold text-sm">Thông báo</span>
+              {unreadCount > 0 && (
+                <Button variant="ghost" size="sm" className="h-auto p-0 text-xs text-primary font-medium" onClick={async (e) => {
+                  e.stopPropagation()
+                  if (!profile) return
+                  await supabase.from('notifications').update({ is_read: true }).eq('user_id', profile.id).eq('is_read', false)
+                  fetchNotifications(profile.id)
+                }}>
+                  Đánh dấu đã đọc
+                </Button>
+              )}
+            </div>
+            <div className="max-h-[350px] overflow-y-auto py-1">
+              {notifications.length === 0 ? (
+                <div className="p-8 text-center text-sm text-muted-foreground flex flex-col items-center gap-2">
+                  <Bell className="h-8 w-8 text-muted-foreground/30" />
+                  <p>Không có thông báo nào</p>
+                </div>
+              ) : (
+                notifications.map(n => (
+                  <DropdownMenuItem 
+                    key={n.id} 
+                    className={`flex flex-col items-start gap-1 p-3 cursor-pointer rounded-none border-b last:border-0 ${!n.is_read ? 'bg-primary/5 hover:bg-primary/10 focus:bg-primary/10' : ''}`}
+                    onClick={() => handleReadNotification(n)}
+                  >
+                    <div className="flex items-start justify-between w-full gap-2">
+                      <span className={`text-sm leading-tight ${!n.is_read ? 'font-semibold text-primary' : 'font-medium'}`}>{n.title}</span>
+                      {!n.is_read && <span className="h-2 w-2 rounded-full bg-primary shrink-0 mt-1" />}
+                    </div>
+                    <span className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{n.message}</span>
+                    <span className="text-[10px] text-muted-foreground/70 mt-0.5">{new Date(n.created_at).toLocaleString('vi-VN')}</span>
+                  </DropdownMenuItem>
+                ))
+              )}
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-80 transition-opacity text-left">
             <Avatar className="h-9 w-9 border border-primary-foreground/20 flex items-center justify-center bg-primary-foreground/10">
