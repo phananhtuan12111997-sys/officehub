@@ -34,6 +34,7 @@ type PostType = {
   attachments?: Attachment[]
   post_reads?: { id: string, user_id: string, reaction_type: string }[]
   comments?: { id: string }[]
+  polls?: any[]
 }
 
 export default function FeedPage() {
