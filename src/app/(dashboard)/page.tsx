@@ -469,7 +469,7 @@ export default function FeedPage() {
                   </div>
                   <div className="flex flex-col gap-2">
                     <label className="text-sm font-semibold">Chuyên mục / Phòng ban</label>
-                    <Select value={department} onValueChange={setDepartment}>
+                    <Select value={department} onValueChange={(val) => setDepartment(val || "Chung")}>
                       <SelectTrigger className="border-primary/20 focus-visible:ring-primary/50">
                         <SelectValue placeholder="Chọn chuyên mục / phòng ban" />
                       </SelectTrigger>
