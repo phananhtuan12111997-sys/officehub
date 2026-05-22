@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Clock, Plus, ArrowRight, Loader2, Paperclip, FileIcon, ChevronsUpDown, Check } from "lucide-react"
+import { Clock, Plus, ArrowRight, Loader2, Paperclip, FileIcon, ChevronsUpDown, Check, Edit, Trash2, X } from "lucide-react"
 import { supabase } from "@/lib/supabase/client"
 import { Comments } from "@/components/ui/comments"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
@@ -56,10 +56,14 @@ export default function TasksPage() {
   const [dueDate, setDueDate] = useState("")
   const [files, setFiles] = useState<File[]>([])
   const [openUserCombo, setOpenUserCombo] = useState(false)
+  const [openDeptCombo, setOpenDeptCombo] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Detail Modal State
   const [selectedTask, setSelectedTask] = useState<TaskType | null>(null)
+  const [isEditingTask, setIsEditingTask] = useState(false)
+  const [editTaskData, setEditTaskData] = useState<Partial<TaskType>>({})
+  const [isUpdating, setIsUpdating] = useState(false)
 
   useEffect(() => {
     fetchTasks()
@@ -191,6 +195,57 @@ export default function TasksPage() {
       fetchTasks()
     }
     setIsSubmitting(false)
+  }
+
+  const handleUpdateTask = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    if (!editTaskData.title || !selectedTask) return
+    setIsUpdating(true)
+    
+    const selectedUser = users.find(u => u.id === editTaskData.assignee_id)
+    const selectedDept = departments.find(d => d.id === editTaskData.department_id)
+
+    let newAssigneeName = "Chưa phân công"
+    if (selectedUser) newAssigneeName = selectedUser.full_name
+    else if (selectedDept) newAssigneeName = `Phòng: ${selectedDept.name}`
+
+    const { error } = await supabase.from('tasks').update({
+      title: editTaskData.title,
+      description: editTaskData.description,
+      priority: editTaskData.priority || 'medium',
+      due_date: editTaskData.due_date || "Không có hạn",
+      due_date_timestamp: editTaskData.due_date ? new Date(editTaskData.due_date).toISOString() : null,
+      assignee_id: editTaskData.assignee_id || null,
+      department_id: editTaskData.department_id || null,
+      assignee: newAssigneeName
+    }).eq('id', selectedTask.id)
+
+    setIsUpdating(false)
+    if (!error) {
+      setIsEditingTask(false)
+      setSelectedTask({
+        ...selectedTask,
+        ...editTaskData,
+        priority: editTaskData.priority || 'medium',
+        due_date: editTaskData.due_date || "Không có hạn",
+        due_date_timestamp: editTaskData.due_date ? new Date(editTaskData.due_date).toISOString() : undefined,
+        assignee: newAssigneeName
+      } as TaskType)
+      fetchTasks()
+    } else {
+      alert("Lỗi cập nhật: " + error.message)
+    }
+  }
+
+  const handleDeleteTask = async (id: string) => {
+    if (!confirm("Bạn có chắc chắn muốn xoá công việc này?")) return
+    const { error } = await supabase.from('tasks').delete().eq('id', id)
+    if (!error) {
+      setSelectedTask(null)
+      fetchTasks()
+    } else {
+      alert("Lỗi xoá công việc: " + error.message)
+    }
   }
 
   const handleMoveTask = async (id: string, currentStatus: string) => {
@@ -334,16 +389,43 @@ export default function TasksPage() {
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium">Giao cho Phòng ban</label>
-                  <Select value={departmentId} onValueChange={(val) => { setDepartmentId(val || ""); setAssigneeId(""); }}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Chọn phòng ban" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {departments.map(d => (
-                        <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={openDeptCombo} onOpenChange={setOpenDeptCombo}>
+                    <PopoverTrigger className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm hover:bg-accent hover:text-accent-foreground font-normal">
+                      {departmentId
+                        ? departments.find((d) => d.id === departmentId)?.name
+                        : "Chọn phòng ban..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[300px] p-0">
+                      <Command>
+                        <CommandInput placeholder="Tìm phòng ban..." />
+                        <CommandList>
+                          <CommandEmpty>Không tìm thấy phòng ban.</CommandEmpty>
+                          <CommandGroup>
+                            {departments.map((d) => (
+                              <CommandItem
+                                key={d.id}
+                                value={d.name}
+                                onSelect={() => {
+                                  setDepartmentId(d.id === departmentId ? "" : d.id)
+                                  setAssigneeId("")
+                                  setOpenDeptCombo(false)
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    departmentId === d.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                {d.name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
 
@@ -367,8 +449,24 @@ export default function TasksPage() {
                   />
                 </div>
                 {files.length > 0 && (
-                  <div className="text-sm text-muted-foreground mt-1">
-                    Đã chọn {files.length} tệp.
+                  <div className="mt-2 flex flex-col gap-2">
+                    {files.map((file, idx) => (
+                      <div key={idx} className="flex items-center justify-between bg-muted p-2 rounded-md text-sm border">
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <FileIcon className="w-4 h-4 shrink-0 text-primary" />
+                          <span className="truncate">{file.name}</span>
+                        </div>
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6 text-destructive shrink-0 hover:bg-destructive/10" 
+                          onClick={() => setFiles(files.filter((_, i) => i !== idx))}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -462,20 +560,122 @@ export default function TasksPage() {
       )}
 
       {/* TASK DETAIL MODAL */}
-      <Dialog open={!!selectedTask} onOpenChange={(open) => !open && setSelectedTask(null)}>
+      <Dialog open={!!selectedTask} onOpenChange={(open) => {
+        if (!open) {
+          setSelectedTask(null)
+          setIsEditingTask(false)
+        }
+      }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <div className="flex items-center gap-2 mb-2">
-              <Badge variant="outline" className={getPriorityColor(selectedTask?.priority || "medium")}>
-                Ưu tiên {getPriorityLabel(selectedTask?.priority || "medium")}
-              </Badge>
-              <Badge variant="secondary">{COLUMNS.find(c => c.id === (selectedTask?.status === 'in-progress' ? 'new' : selectedTask?.status))?.title}</Badge>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 mb-2">
+                <Badge variant="outline" className={getPriorityColor(selectedTask?.priority || "medium")}>
+                  Ưu tiên {getPriorityLabel(selectedTask?.priority || "medium")}
+                </Badge>
+                <Badge variant="secondary">{COLUMNS.find(c => c.id === (selectedTask?.status === 'in-progress' ? 'new' : selectedTask?.status))?.title}</Badge>
+              </div>
+              <div className="flex items-center gap-1">
+                {!isEditingTask && selectedTask && (
+                  <>
+                    <Button variant="ghost" size="icon" onClick={() => {
+                      setEditTaskData({
+                        title: selectedTask.title,
+                        description: selectedTask.description || "",
+                        due_date: selectedTask.due_date_timestamp ? new Date(selectedTask.due_date_timestamp).toISOString().split('T')[0] : selectedTask.due_date !== "Không có hạn" ? selectedTask.due_date : "",
+                        priority: selectedTask.priority,
+                        assignee_id: selectedTask.assignee_id || "",
+                        department_id: selectedTask.department_id || ""
+                      })
+                      setIsEditingTask(true)
+                    }}>
+                      <Edit className="w-4 h-4 text-muted-foreground" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => handleDeleteTask(selectedTask.id)} className="hover:bg-destructive/10">
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
+                  </>
+                )}
+              </div>
             </div>
-            <DialogTitle className="text-xl">{selectedTask?.title}</DialogTitle>
+            {!isEditingTask && <DialogTitle className="text-xl">{selectedTask?.title}</DialogTitle>}
           </DialogHeader>
 
-          <div className="space-y-6 py-4">
-            <div className="grid grid-cols-2 gap-4 text-sm bg-muted/30 p-4 rounded-lg">
+          {isEditingTask ? (
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium">Tiêu đề công việc</label>
+                  <Input 
+                    value={editTaskData.title || ""}
+                    onChange={(e) => setEditTaskData({...editTaskData, title: e.target.value})}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium">Hạn chót</label>
+                  <Input 
+                    type="date"
+                    value={editTaskData.due_date || ""}
+                    onChange={(e) => setEditTaskData({...editTaskData, due_date: e.target.value})}
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium">Mô tả</label>
+                <Textarea 
+                  value={editTaskData.description || ""}
+                  onChange={(e) => setEditTaskData({...editTaskData, description: e.target.value})}
+                  rows={3}
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium">Mức độ ưu tiên</label>
+                  <Select value={editTaskData.priority || "medium"} onValueChange={(val) => setEditTaskData({...editTaskData, priority: val || "medium"})}>
+                    <SelectTrigger><SelectValue placeholder="Ưu tiên" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Thấp</SelectItem>
+                      <SelectItem value="medium">Trung bình</SelectItem>
+                      <SelectItem value="high">Cao</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium">Giao cho cá nhân</label>
+                  <Select value={editTaskData.assignee_id || "none"} onValueChange={(val) => setEditTaskData({...editTaskData, assignee_id: val === "none" ? "" : (val || ""), department_id: ""})}>
+                    <SelectTrigger><SelectValue placeholder="Chọn người" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Không chọn</SelectItem>
+                      {users.map(u => (
+                        <SelectItem key={u.id} value={u.id}>{u.full_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium">Phòng ban</label>
+                  <Select value={editTaskData.department_id || "none"} onValueChange={(val) => setEditTaskData({...editTaskData, department_id: val === "none" ? "" : (val || ""), assignee_id: ""})}>
+                    <SelectTrigger><SelectValue placeholder="Chọn phòng" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Không chọn</SelectItem>
+                      {departments.map(d => (
+                        <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-4">
+                <Button variant="outline" onClick={() => setIsEditingTask(false)}>Hủy</Button>
+                <Button onClick={() => handleUpdateTask()} disabled={isUpdating}>
+                  {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Lưu thay đổi
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6 py-4">
+              <div className="grid grid-cols-2 gap-4 text-sm bg-muted/30 p-4 rounded-lg">
               <div>
                 <span className="text-muted-foreground block mb-1">Người nhận:</span>
                 <span className="font-medium">{selectedTask?.assignee}</span>
@@ -519,6 +719,7 @@ export default function TasksPage() {
               {selectedTask && <Comments taskId={selectedTask.id} />}
             </div>
           </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
