@@ -14,8 +14,9 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { 
   FileIcon, Search, Upload, Download, Loader2, Folder as FolderIcon, 
-  Plus, ChevronLeft, Eye, FileText, ImageIcon, FileSpreadsheet, FileIcon as FilePdf, Trash2, Edit2, Pin
+  Plus, ChevronLeft, Eye, FileText, ImageIcon, FileSpreadsheet, FileIcon as FilePdf, Trash2, Edit2, Pin, LayoutGrid, List
 } from "lucide-react"
+import { Progress } from "@/components/ui/progress"
 import { supabase } from "@/lib/supabase/client"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -74,6 +75,8 @@ export default function DocumentsPage() {
   const [isSavingEdit, setIsSavingEdit] = useState(false)
 
   const [editingFolder, setEditingFolder] = useState<FolderType | null>(null)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table')
   const [editFolderName, setEditFolderName] = useState("")
   const [editFolderDepartment, setEditFolderDepartment] = useState("Chung")
   const [isSavingFolderEdit, setIsSavingFolderEdit] = useState(false)
@@ -263,6 +266,14 @@ export default function DocumentsPage() {
     }
 
     setUploading(true)
+    setUploadProgress(0)
+
+    const progressInterval = setInterval(() => {
+      setUploadProgress(prev => {
+        if (prev >= 90) return prev;
+        return prev + Math.random() * 15;
+      });
+    }, 200);
     
     // Upload to Storage
     const fileExt = finalFileName.split('.').pop()
@@ -272,11 +283,15 @@ export default function DocumentsPage() {
       .from('documents')
       .upload(storageFileName, file)
 
+    clearInterval(progressInterval);
+
     if (uploadError) {
       alert("Lỗi tải lên: " + uploadError.message)
       setUploading(false)
+      setUploadProgress(0)
       return
     }
+    setUploadProgress(100);
 
     // Get public URL
     const { data: { publicUrl } } = supabase.storage
@@ -502,11 +517,17 @@ export default function DocumentsPage() {
           <Button 
             onClick={handleUploadClick} 
             disabled={uploading || !currentFolder} 
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 relative overflow-hidden"
             title={!currentFolder ? "Bạn cần chọn một thư mục trước khi tải file" : ""}
           >
-            {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-            {uploading ? "Đang tải lên..." : (!currentFolder ? "Chọn thư mục để tải lên" : "Tải lên tài liệu")}
+            {uploading ? <Loader2 className="w-4 h-4 animate-spin relative z-10" /> : <Upload className="w-4 h-4 relative z-10" />}
+            <span className="relative z-10">{uploading ? `Đang tải lên ${Math.round(uploadProgress)}%...` : (!currentFolder ? "Chọn thư mục để tải lên" : "Tải lên tài liệu")}</span>
+            {uploading && (
+              <div 
+                className="absolute left-0 top-0 bottom-0 bg-primary/20 transition-all duration-300"
+                style={{ width: `${uploadProgress}%` }}
+              />
+            )}
           </Button>
         </div>
       </div>
@@ -517,24 +538,34 @@ export default function DocumentsPage() {
           setFilterDept(val)
           setCurrentFolder(null)
           setSearchQuery("")
-        }} className="w-full md:w-auto">
+        }} className="w-full md:w-auto overflow-auto">
           <TabsList className="flex flex-wrap h-auto w-full justify-start bg-transparent">
-            <TabsTrigger value="all" className="data-active:bg-primary data-active:text-primary-foreground rounded-full px-4">Tất cả</TabsTrigger>
-            <TabsTrigger value="Chung" className="data-active:bg-primary data-active:text-primary-foreground rounded-full px-4">Chung</TabsTrigger>
+            <TabsTrigger value="all" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-4">Tất cả</TabsTrigger>
+            <TabsTrigger value="Chung" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-4">Chung</TabsTrigger>
             {departments.map(d => (
-              <TabsTrigger key={d.id} value={d.name} className="data-active:bg-primary data-active:text-primary-foreground rounded-full px-4">Phòng {d.name}</TabsTrigger>
+              <TabsTrigger key={d.id} value={d.name} className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-4 whitespace-nowrap">Phòng {d.name}</TabsTrigger>
             ))}
           </TabsList>
         </Tabs>
-        <div className="relative w-full md:w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input 
-            type="search" 
-            placeholder="Tìm kiếm tài liệu..." 
-            className="pl-9 bg-muted/40 border-none rounded-full" 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+          <div className="flex items-center border rounded-md p-1 bg-muted/40 shrink-0">
+             <Button variant="ghost" size="icon" className={`w-8 h-8 rounded-sm ${viewMode === 'table' ? 'bg-background shadow-sm' : ''}`} onClick={() => setViewMode('table')} title="Xem danh sách">
+                <List className="w-4 h-4" />
+             </Button>
+             <Button variant="ghost" size="icon" className={`w-8 h-8 rounded-sm ${viewMode === 'grid' ? 'bg-background shadow-sm' : ''}`} onClick={() => setViewMode('grid')} title="Xem dạng lưới">
+                <LayoutGrid className="w-4 h-4" />
+             </Button>
+          </div>
+          <div className="relative w-full md:w-64 lg:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input 
+              type="search" 
+              placeholder="Tìm kiếm tài liệu..." 
+              className="pl-9 bg-muted/40 border-none rounded-full" 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
         </div>
       </div>
 
@@ -570,7 +601,7 @@ export default function DocumentsPage() {
       )}
 
       <div 
-        className={`border rounded-xl bg-card shadow-sm overflow-hidden transition-all duration-200 relative ${isDragging ? "border-primary border-dashed border-2 bg-primary/5" : ""}`}
+        className={`border rounded-xl bg-card shadow-sm overflow-hidden transition-all duration-200 relative ${isDragging ? "border-primary border-dashed border-2 bg-primary/5" : ""} ${viewMode === 'grid' ? "p-4 bg-transparent border-none shadow-none" : ""}`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -582,7 +613,9 @@ export default function DocumentsPage() {
             <p className="text-muted-foreground mt-2">File sẽ được tải lên thư mục hiện tại</p>
           </div>
         )}
-        <Table>
+        
+        {viewMode === 'table' ? (
+          <Table>
           <TableHeader className="bg-muted/50">
             <TableRow>
               <TableHead>Tên tài liệu / Thư mục</TableHead>
@@ -725,6 +758,81 @@ export default function DocumentsPage() {
             )}
           </TableBody>
         </Table>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+             {loading ? (
+                <div className="col-span-full flex justify-center p-10"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
+             ) : (!currentFolder && !isSearching && folders.length === 0) || ((currentFolder || isSearching) && files.length === 0) ? (
+                <div className="col-span-full flex flex-col items-center justify-center p-10 text-muted-foreground">
+                   <FolderIcon className="w-12 h-12 mb-4 opacity-20" />
+                   <p>Chưa có tài liệu hoặc thư mục nào</p>
+                </div>
+             ) : (
+                <>
+                  {!isSearching && !currentFolder && folders
+                    .filter(f => filterDept === "all" ? true : (f.department || "Chung") === filterDept)
+                    .map(folder => (
+                    <div key={folder.id} onClick={() => setCurrentFolder(folder)} className="border rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 hover:border-primary/50 transition-colors group relative bg-card shadow-sm">
+                      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                         {isAdmin && (
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => handleTogglePinFolder(e, folder)} title={folder.is_pinned ? "Bỏ ghim" : "Ghim"}>
+                              <Pin className={`w-3 h-3 ${folder.is_pinned ? "fill-primary text-primary" : ""}`} />
+                            </Button>
+                         )}
+                         {isAdmin && (
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-yellow-600" onClick={(e) => { e.stopPropagation(); handleEditFolder(folder); }}>
+                              <Edit2 className="w-3 h-3" />
+                            </Button>
+                         )}
+                         {isAdmin && (
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder.id); }}>
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                         )}
+                      </div>
+                      <div className="relative">
+                        <FolderIcon className={`w-12 h-12 mb-3 ${folder.is_pinned ? 'text-yellow-600 fill-yellow-200' : 'text-yellow-500 fill-yellow-100'}`} />
+                        {folder.is_pinned && (
+                          <div className="absolute -top-1 -right-1 bg-primary text-primary-foreground rounded-full p-0.5 shadow-sm">
+                            <Pin className="w-3 h-3 fill-current" />
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-center text-sm font-medium line-clamp-2 w-full px-2" title={folder.name}>{folder.name}</span>
+                      <span className="text-xs text-muted-foreground mt-1 bg-secondary px-2 rounded-full">{folder.department || "Chung"}</span>
+                    </div>
+                  ))}
+                  
+                  {files
+                    .filter(f => filterDept === "all" || currentFolder ? true : (f.department || "Chung") === filterDept)
+                    .map(file => (
+                    <div key={file.id} onClick={() => setPreviewFile(file)} className="border rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 hover:border-primary/50 transition-colors group relative bg-card shadow-sm">
+                      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 backdrop-blur-sm rounded-md p-1 shadow-sm">
+                         <Button variant="ghost" size="icon" className="h-6 w-6 text-blue-500" onClick={(e) => handleDownload(e, file.file_url)} title="Tải xuống">
+                           <Download className="w-3 h-3" />
+                         </Button>
+                         {(isAdmin || currentUserId === file.uploaded_by) && (
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-yellow-600" onClick={(e) => handleEdit(e, file)} title="Đổi tên">
+                              <Edit2 className="w-3 h-3" />
+                            </Button>
+                         )}
+                         {(isAdmin || currentUserId === file.uploaded_by) && (
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={(e) => handleDelete(e, file.id)} title="Xóa">
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                         )}
+                      </div>
+                      <div className="w-12 h-12 mb-3 flex items-center justify-center">
+                         {getFileIcon(file.name)}
+                      </div>
+                      <span className="text-center text-sm font-medium line-clamp-2 w-full px-2" title={file.name}>{file.name}</span>
+                      <span className="text-xs text-muted-foreground mt-1">{file.size}</span>
+                    </div>
+                  ))}
+                </>
+             )}
+          </div>
+        )}
       </div>
 
       {/* Folder Creation Dialog */}
