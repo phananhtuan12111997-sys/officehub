@@ -20,6 +20,7 @@ type PostType = {
   content: string
   department: string
   author_name: string
+  author_id?: string
   created_at: string
   attachments?: Attachment[]
   polls?: any[]

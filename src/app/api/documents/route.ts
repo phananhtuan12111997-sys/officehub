@@ -57,7 +57,8 @@ export async function GET(req: Request) {
 
     const { data: profile } = await supabaseAdmin.from("profiles").select("role, department_id, departments(name)").eq("id", user.id).single()
     const isAdmin = profile?.role === "admin"
-    const userDeptName = profile?.departments?.name
+    const deptData: any = profile?.departments;
+    const userDeptName = Array.isArray(deptData) ? deptData[0]?.name : deptData?.name;
 
     const { searchParams } = new URL(req.url)
     const folderId = searchParams.get("folder_id")
