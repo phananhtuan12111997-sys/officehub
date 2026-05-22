@@ -63,6 +63,7 @@ export default function TasksPage() {
   const [selectedTask, setSelectedTask] = useState<TaskType | null>(null)
   const [isEditingTask, setIsEditingTask] = useState(false)
   const [editTaskData, setEditTaskData] = useState<Partial<TaskType>>({})
+  const [editTaskNewFiles, setEditTaskNewFiles] = useState<File[]>([])
   const [isUpdating, setIsUpdating] = useState(false)
 
   useEffect(() => {
@@ -99,9 +100,9 @@ export default function TasksPage() {
     }
   }
 
-  const uploadFiles = async () => {
+  const uploadFiles = async (fileList: File[] = files) => {
     const uploadedAttachments = []
-    for (const file of files) {
+    for (const file of fileList) {
       const fileExt = file.name.split('.').pop()
       const fileName = `${Math.random()}.${fileExt}`
       const filePath = `tasks/${fileName}`
@@ -202,6 +203,12 @@ export default function TasksPage() {
     if (!editTaskData.title || !selectedTask) return
     setIsUpdating(true)
     
+    let newlyUploaded: any[] = []
+    if (editTaskNewFiles.length > 0) {
+      newlyUploaded = await uploadFiles(editTaskNewFiles)
+    }
+    const finalAttachments = [...(editTaskData.attachments || []), ...newlyUploaded]
+
     const selectedUser = users.find(u => u.id === editTaskData.assignee_id)
     const selectedDept = departments.find(d => d.id === editTaskData.department_id)
 
@@ -217,7 +224,8 @@ export default function TasksPage() {
       due_date_timestamp: editTaskData.due_date ? new Date(editTaskData.due_date).toISOString() : null,
       assignee_id: editTaskData.assignee_id || null,
       department_id: editTaskData.department_id || null,
-      assignee: newAssigneeName
+      assignee: newAssigneeName,
+      attachments: finalAttachments
     }).eq('id', selectedTask.id)
 
     setIsUpdating(false)
@@ -229,8 +237,10 @@ export default function TasksPage() {
         priority: editTaskData.priority || 'medium',
         due_date: editTaskData.due_date || "Không có hạn",
         due_date_timestamp: editTaskData.due_date ? new Date(editTaskData.due_date).toISOString() : undefined,
-        assignee: newAssigneeName
+        assignee: newAssigneeName,
+        attachments: finalAttachments
       } as TaskType)
+      setEditTaskNewFiles([])
       fetchTasks()
     } else {
       alert("Lỗi cập nhật: " + error.message)
@@ -585,7 +595,8 @@ export default function TasksPage() {
                         due_date: selectedTask.due_date_timestamp ? new Date(selectedTask.due_date_timestamp).toISOString().split('T')[0] : selectedTask.due_date !== "Không có hạn" ? selectedTask.due_date : "",
                         priority: selectedTask.priority,
                         assignee_id: selectedTask.assignee_id || "",
-                        department_id: selectedTask.department_id || ""
+                        department_id: selectedTask.department_id || "",
+                        attachments: selectedTask.attachments || []
                       })
                       setIsEditingTask(true)
                     }}>
@@ -677,8 +688,60 @@ export default function TasksPage() {
                   </Select>
                 </div>
               </div>
+
+              <div className="flex flex-col gap-2 mt-4">
+                <label className="text-sm font-medium">Tệp đính kèm hiện tại</label>
+                {editTaskData.attachments && editTaskData.attachments.length > 0 ? (
+                  <div className="flex flex-col gap-2">
+                    {editTaskData.attachments.map((file, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-2 border rounded-md text-sm">
+                        <div className="flex items-center gap-2 truncate">
+                          <FileIcon className="w-4 h-4 text-primary" />
+                          <a href={file.url} target="_blank" rel="noopener noreferrer" className="hover:underline truncate">{file.name}</a>
+                        </div>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setEditTaskData({...editTaskData, attachments: editTaskData.attachments?.filter((_, i) => i !== idx)})}>
+                          <X className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-sm text-muted-foreground">Không có tệp nào</span>
+                )}
+              </div>
+              <div className="flex flex-col gap-2 mt-2">
+                <label className="text-sm font-medium">Thêm tệp mới</label>
+                <div className="flex items-center gap-2">
+                  <Input 
+                    type="file" 
+                    multiple
+                    className="cursor-pointer"
+                    onChange={(e) => {
+                      if (e.target.files) {
+                        setEditTaskNewFiles(Array.from(e.target.files))
+                      }
+                    }}
+                  />
+                </div>
+                {editTaskNewFiles.length > 0 && (
+                  <div className="flex flex-col gap-1 mt-1">
+                    {editTaskNewFiles.map((file, idx) => (
+                      <div key={idx} className="flex items-center justify-between bg-muted/50 p-2 rounded text-sm">
+                        <span className="truncate">{file.name}</span>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setEditTaskNewFiles(editTaskNewFiles.filter((_, i) => i !== idx))}>
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div className="flex justify-end gap-2 mt-4">
-                <Button variant="outline" onClick={() => setIsEditingTask(false)}>Hủy</Button>
+                <Button variant="outline" onClick={() => {
+                  setIsEditingTask(false);
+                  setEditTaskNewFiles([]);
+                }}>Hủy</Button>
                 <Button onClick={() => handleUpdateTask()} disabled={isUpdating}>
                   {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Lưu thay đổi
