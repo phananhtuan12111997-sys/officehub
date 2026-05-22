@@ -76,15 +76,29 @@ export async function PATCH(req: Request) {
   if (!isAdmin) return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
 
   const body = await req.json()
-  const { id, role } = body
+  const { id, role, full_name, password } = body
 
-  const { error } = await supabaseAdmin
-    .from("profiles")
-    .update({ role })
-    .eq("id", id)
+  // Update profile
+  const updateData: any = {}
+  if (role) updateData.role = role
+  if (full_name) updateData.full_name = full_name
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-  return NextResponse.json({ message: "Role updated" })
+  if (Object.keys(updateData).length > 0) {
+    const { error } = await supabaseAdmin
+      .from("profiles")
+      .update(updateData)
+      .eq("id", id)
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  }
+
+  // Update password if provided
+  if (password && password.trim() !== "") {
+    const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(id, { password: password.trim() })
+    if (authError) return NextResponse.json({ error: authError.message }, { status: 400 })
+  }
+
+  return NextResponse.json({ message: "User updated" })
 }
 
 export async function DELETE(req: Request) {
@@ -96,7 +110,18 @@ export async function DELETE(req: Request) {
 
   if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 })
 
-  // Xóa user từ Auth. Cascade sẽ tự xóa Profile.
+  // Clean up related records manually to prevent FK constraint errors
+  await supabaseAdmin.from('comment_reactions').delete().eq('user_id', id)
+  await supabaseAdmin.from('comments').delete().eq('author_id', id)
+  await supabaseAdmin.from('notifications').delete().eq('user_id', id)
+  await supabaseAdmin.from('mailbox').delete().or(`sender_id.eq.${id},receiver_id.eq.${id}`)
+  await supabaseAdmin.from('tasks').update({ assignee_id: null }).eq('assignee_id', id)
+  await supabaseAdmin.from('posts').delete().eq('author_id', id)
+
+  // Profile is usually cascade deleted, but let's be explicit
+  await supabaseAdmin.from('profiles').delete().eq('id', id)
+
+  // Xóa user từ Auth.
   const { error } = await supabaseAdmin.auth.admin.deleteUser(id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })

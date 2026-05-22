@@ -35,6 +35,9 @@ export function Header() {
   const [notifications, setNotifications] = useState<any[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
 
+  // Mobile menu state
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
   const fetchNotifications = async (userId: string) => {
     const { data } = await supabase
       .from('notifications')
@@ -169,7 +172,7 @@ export function Header() {
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b border-primary-foreground/20 bg-primary text-primary-foreground px-4 sm:h-16 sm:px-6 shadow-sm relative">
       {/* Mobile Menu Trigger */}
-      <Sheet>
+      <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
         <SheetTrigger className="sm:hidden border border-primary-foreground/20 bg-transparent hover:bg-primary-foreground/10 text-primary-foreground hover:text-white inline-flex items-center justify-center rounded-md h-9 w-9 shrink-0">
           <Menu className="h-5 w-5" />
           <span className="sr-only">Toggle Menu</span>
@@ -182,22 +185,22 @@ export function Header() {
           </div>
           <div className="flex-1 overflow-auto py-4">
             <nav className="grid items-start px-2 text-sm font-medium gap-1">
-              <Link href="/" className="flex items-center gap-3 rounded-lg px-3 py-2 text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10">
+              <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2 text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10">
                 <Home className="h-4 w-4" /> Bảng tin
               </Link>
-              <Link href="/documents" className="flex items-center gap-3 rounded-lg px-3 py-2 text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10">
+              <Link href="/documents" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2 text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10">
                 <FileText className="h-4 w-4" /> Tài liệu
               </Link>
-              <Link href="/tasks" className="flex items-center gap-3 rounded-lg px-3 py-2 text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10">
+              <Link href="/tasks" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2 text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10">
                 <CheckSquare className="h-4 w-4" /> Công việc
               </Link>
-              <Link href="/inbox" className="flex items-center gap-3 rounded-lg px-3 py-2 text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10">
+              <Link href="/inbox" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2 text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10">
                 <Mail className="h-4 w-4" /> Hộp thư
               </Link>
               {profile?.role === "admin" && (
                 <>
                   <div className="mt-4 px-3 text-xs font-semibold uppercase tracking-wider text-primary-foreground/60">Quản trị</div>
-                  <Link href="/admin" className="flex items-center gap-3 rounded-lg px-3 py-2 text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10">
+                  <Link href="/admin" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2 text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10">
                     <ShieldAlert className="h-4 w-4" /> Nhân sự
                   </Link>
                 </>

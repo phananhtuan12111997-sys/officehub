@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 import { supabase } from "@/lib/supabase/client"
-import { Loader2, Plus, ShieldAlert, Trash2 } from "lucide-react"
+import { Loader2, Plus, ShieldAlert, Trash2, Edit } from "lucide-react"
 
 type Profile = {
   id: string
@@ -28,11 +28,20 @@ export default function AdminPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState("")
 
-  // Form
+  // Create Form
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [fullName, setFullName] = useState("")
   const [role, setRole] = useState("staff")
+
+  // Edit Form
+  const [editingUser, setEditingUser] = useState<Profile | null>(null)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [editFullName, setEditFullName] = useState("")
+  const [editRole, setEditRole] = useState("staff")
+  const [editPassword, setEditPassword] = useState("")
+  const [isEditSubmitting, setIsEditSubmitting] = useState(false)
+  const [editError, setEditError] = useState("")
 
   useEffect(() => {
     checkAdminAndFetch()
@@ -110,7 +119,7 @@ export default function AdminPage() {
   }
 
   const handleDeleteUser = async (id: string) => {
-    if (!confirm("Bạn có chắc chắn muốn xóa nhân viên này vĩnh viễn?")) return
+    if (!confirm("Bạn có chắc chắn muốn xóa nhân viên này vĩnh viễn? Dữ liệu của nhân viên này sẽ bị xóa!")) return
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) return
 
@@ -127,6 +136,52 @@ export default function AdminPage() {
       }
     } catch (err) {
       console.error(err)
+    }
+  }
+
+  const openEditDialog = (profile: Profile) => {
+    setEditingUser(profile)
+    setEditFullName(profile.full_name || "")
+    setEditRole(profile.role)
+    setEditPassword("")
+    setEditError("")
+    setIsEditDialogOpen(true)
+  }
+
+  const handleEditUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingUser) return
+
+    setIsEditSubmitting(true)
+    setEditError("")
+
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ 
+          id: editingUser.id, 
+          role: editRole, 
+          full_name: editFullName, 
+          password: editPassword 
+        })
+      })
+      
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Có lỗi xảy ra")
+
+      setIsEditDialogOpen(false)
+      fetchUsers(session.access_token)
+    } catch (err: any) {
+      setEditError(err.message)
+    } finally {
+      setIsEditSubmitting(false)
     }
   }
 
@@ -197,6 +252,49 @@ export default function AdminPage() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Dialog Edit User */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Sửa thông tin tài khoản</DialogTitle>
+              <DialogDescription>Cập nhật họ tên, vai trò hoặc đổi mật khẩu cho {editingUser?.email}</DialogDescription>
+            </DialogHeader>
+            
+            <form onSubmit={handleEditUser} className="space-y-4 py-4">
+              {editError && <div className="text-sm text-destructive font-medium">{editError}</div>}
+              
+              <div className="space-y-2">
+                <Label htmlFor="edit-fullname">Họ và tên</Label>
+                <Input id="edit-fullname" value={editFullName} onChange={(e) => setEditFullName(e.target.value)} required placeholder="Nguyễn Văn A" />
+              </div>
+              <div className="space-y-2">
+                <Label>Vai trò</Label>
+                <select 
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  value={editRole}
+                  onChange={(e) => setEditRole(e.target.value)}
+                >
+                  <option value="staff">Nhân viên (Staff)</option>
+                  <option value="admin">Quản trị viên (Admin)</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-password">Mật khẩu mới (Tùy chọn)</Label>
+                <Input id="edit-password" type="text" value={editPassword} onChange={(e) => setEditPassword(e.target.value)} placeholder="Để trống nếu không muốn đổi mật khẩu" minLength={6} />
+                <p className="text-xs text-muted-foreground">Nhập mật khẩu mới nếu muốn thay đổi, ngược lại cứ để trống.</p>
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>Hủy</Button>
+                <Button type="submit" disabled={isEditSubmitting}>
+                  {isEditSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Lưu thay đổi
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <Card>
@@ -227,6 +325,9 @@ export default function AdminPage() {
                   </TableCell>
                   <TableCell>{new Date(p.created_at).toLocaleDateString("vi-VN")}</TableCell>
                   <TableCell className="text-right">
+                    <Button variant="ghost" size="icon" className="text-primary hover:bg-primary/10 hover:text-primary mr-1" onClick={() => openEditDialog(p)}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
                     <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => handleDeleteUser(p.id)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
