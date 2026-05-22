@@ -17,6 +17,8 @@ type PostType = {
   author_name: string
   created_at: string
   attachments?: Attachment[]
+  polls?: any[]
+  post_reads?: { id: string, user_id: string, reaction_type: string }[]
 }
 
 type TaskType = {

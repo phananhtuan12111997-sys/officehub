@@ -23,6 +23,7 @@ type PostType = {
   created_at: string
   attachments?: Attachment[]
   polls?: any[]
+  post_reads?: { id: string, user_id: string, reaction_type: string }[]
 }
 
 export default function PostDetailPage() {
