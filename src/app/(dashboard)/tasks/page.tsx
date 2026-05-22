@@ -134,7 +134,7 @@ export default function TasksPage() {
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium">Người nhận</label>
-                  <Select value={assigneeId} onValueChange={setAssigneeId}>
+                  <Select value={assigneeId} onValueChange={(val) => setAssigneeId(val || "")}>
                     <SelectTrigger>
                       <SelectValue placeholder="Chọn người nhận" />
                     </SelectTrigger>
