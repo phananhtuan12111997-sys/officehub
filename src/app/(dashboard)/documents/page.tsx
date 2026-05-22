@@ -14,7 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { 
   FileIcon, Search, Upload, Download, Loader2, Folder as FolderIcon, 
-  Plus, ChevronLeft, Eye, FileText, ImageIcon, FileSpreadsheet, FileIcon as FilePdf, Trash2, Edit2
+  Plus, ChevronLeft, Eye, FileText, ImageIcon, FileSpreadsheet, FileIcon as FilePdf, Trash2, Edit2, Pin
 } from "lucide-react"
 import { supabase } from "@/lib/supabase/client"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
@@ -36,6 +36,7 @@ type FolderType = {
   id: string
   name: string
   department?: string
+  is_pinned?: boolean
   created_at: string
 }
 
@@ -63,6 +64,9 @@ export default function DocumentsPage() {
   // Search State
   const [searchQuery, setSearchQuery] = useState("")
   const [isSearching, setIsSearching] = useState(false)
+
+  // Drag and Drop
+  const [isDragging, setIsDragging] = useState(false)
 
   // Edit State
   const [editingFile, setEditingFile] = useState<DocumentType | null>(null)
@@ -212,16 +216,61 @@ export default function DocumentsPage() {
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
+    await processFileUpload(file)
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    if (!currentFolder) return
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+    if (!currentFolder) return
+    
+    const file = e.dataTransfer.files?.[0]
+    if (file) {
+      processFileUpload(file)
+    }
+  }
+
+  const processFileUpload = async (file: File) => {
+    let finalFileName = file.name;
+    
+    // Check duplicates
+    const exists = files.find(f => f.name === finalFileName);
+    if (exists) {
+      const newName = prompt(`Tài liệu "${finalFileName}" đã tồn tại. Vui lòng nhập tên mới (hoặc bấm Hủy để hủy tải lên):`, finalFileName);
+      if (!newName || !newName.trim()) {
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return; // Cancelled
+      }
+      finalFileName = newName.trim();
+      
+      // Keep extension if they accidentally removed it
+      const origExt = file.name.split('.').pop() || "";
+      const newExt = finalFileName.split('.').pop() || "";
+      if (origExt && newExt !== origExt) {
+        finalFileName = `${finalFileName}.${origExt}`;
+      }
+    }
 
     setUploading(true)
     
     // Upload to Storage
-    const fileExt = file.name.split('.').pop()
-    const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
+    const fileExt = finalFileName.split('.').pop()
+    const storageFileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
     
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('documents')
-      .upload(fileName, file)
+      .upload(storageFileName, file)
 
     if (uploadError) {
       alert("Lỗi tải lên: " + uploadError.message)
@@ -232,7 +281,7 @@ export default function DocumentsPage() {
     // Get public URL
     const { data: { publicUrl } } = supabase.storage
       .from('documents')
-      .getPublicUrl(fileName)
+      .getPublicUrl(storageFileName)
 
     // Insert to DB
     try {
@@ -245,7 +294,7 @@ export default function DocumentsPage() {
             Authorization: `Bearer ${session.access_token}`
           },
           body: JSON.stringify({
-            name: file.name,
+            name: finalFileName,
             file_url: publicUrl,
             size: formatBytes(file.size),
             department: currentFolder ? (currentFolder.department || "Chung") : "Chung",
@@ -360,6 +409,28 @@ export default function DocumentsPage() {
       }
     }
     setIsSavingFolderEdit(false)
+  }
+
+  const handleTogglePinFolder = async (e: React.MouseEvent, folder: FolderType) => {
+    e.stopPropagation()
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+
+    const res = await fetch('/api/documents/folders', {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({ id: folder.id, is_pinned: !folder.is_pinned })
+    })
+
+    if (!res.ok) {
+      const errorData = await res.json()
+      alert("Lỗi ghim thư mục: " + errorData.error)
+    } else {
+      fetchData()
+    }
   }
 
   const handleDeleteFolder = async (id: string) => {
@@ -498,7 +569,19 @@ export default function DocumentsPage() {
         </div>
       )}
 
-      <div className="border rounded-xl bg-card shadow-sm overflow-hidden">
+      <div 
+        className={`border rounded-xl bg-card shadow-sm overflow-hidden transition-all duration-200 relative ${isDragging ? "border-primary border-dashed border-2 bg-primary/5" : ""}`}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        {isDragging && (
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm border-2 border-primary border-dashed rounded-xl pointer-events-none">
+            <Upload className="w-12 h-12 text-primary mb-4 animate-bounce" />
+            <h3 className="text-xl font-bold text-primary">Kéo thả file vào đây</h3>
+            <p className="text-muted-foreground mt-2">File sẽ được tải lên thư mục hiện tại</p>
+          </div>
+        )}
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow>
@@ -534,8 +617,13 @@ export default function DocumentsPage() {
                     onClick={() => setCurrentFolder(folder)}
                   >
                     <TableCell className="font-medium flex items-center gap-3">
-                      <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
+                      <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg relative">
                         <FolderIcon className="w-5 h-5 text-yellow-600 dark:text-yellow-500 fill-yellow-200 dark:fill-yellow-900/50" />
+                        {folder.is_pinned && (
+                          <div className="absolute -top-1 -right-1 bg-primary text-primary-foreground rounded-full p-0.5 shadow-sm">
+                            <Pin className="w-3 h-3 fill-current" />
+                          </div>
+                        )}
                       </div>
                       {folder.name}
                     </TableCell>
@@ -548,9 +636,21 @@ export default function DocumentsPage() {
                     <TableCell className="text-muted-foreground">-</TableCell>
                     <TableCell className="text-right">
                       {isAdmin && (
-                        <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEditFolder(folder); }} className="text-muted-foreground hover:text-primary"><Edit2 className="w-4 h-4" /></Button>
-                          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder.id); }} className="text-muted-foreground hover:text-destructive"><Trash2 className="w-4 h-4" /></Button>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={(e) => handleTogglePinFolder(e, folder)}
+                            title={folder.is_pinned ? "Bỏ ghim" : "Ghim thư mục"}
+                          >
+                            <Pin className={`w-4 h-4 ${folder.is_pinned ? "fill-primary text-primary" : "text-muted-foreground"}`} />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEditFolder(folder); }}>
+                            <Edit2 className="w-4 h-4 text-blue-500" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder.id); }}>
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </Button>
                         </div>
                       )}
                     </TableCell>

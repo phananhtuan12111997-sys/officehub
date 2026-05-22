@@ -61,10 +61,27 @@ export async function GET(req: Request) {
     
     if (authError || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
 
-    const { data, error } = await supabaseAdmin
+    const { data: profile } = await supabaseAdmin.from("profiles").select("role, department_id, departments(name)").eq("id", user.id).single()
+    const isAdmin = profile?.role === "admin"
+    const userDeptName = profile?.departments?.name
+
+    let query = supabaseAdmin
       .from("document_folders")
       .select("*")
+      // To support `is_pinned`, make sure you ran the SQL command to add it to the table.
+      // If it's not present, this sort might fail. But we assume it will be there.
+      .order("is_pinned", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false })
+
+    if (!isAdmin) {
+      if (userDeptName) {
+        query = query.in("department", ["Chung", userDeptName])
+      } else {
+        query = query.eq("department", "Chung")
+      }
+    }
+
+    const { data, error } = await query
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     
@@ -86,10 +103,15 @@ export async function PATCH(req: Request) {
     const { data: profile } = await supabaseAdmin.from("profiles").select("role").eq("id", user.id).single()
     if (profile?.role !== "admin") return NextResponse.json({ error: "Admin only" }, { status: 403 })
 
-    const { id, name, department } = await req.json()
-    if (!id || !name) return NextResponse.json({ error: "Missing fields" }, { status: 400 })
+    const { id, name, department, is_pinned } = await req.json()
+    if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 })
 
-    const { data, error } = await supabaseAdmin.from("document_folders").update({ name, department: department || 'Chung' }).eq("id", id).select()
+    const updateData: any = {}
+    if (name !== undefined) updateData.name = name
+    if (department !== undefined) updateData.department = department || 'Chung'
+    if (is_pinned !== undefined) updateData.is_pinned = is_pinned
+
+    const { data, error } = await supabaseAdmin.from("document_folders").update(updateData).eq("id", id).select()
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     return NextResponse.json(data)
   } catch (err: any) {

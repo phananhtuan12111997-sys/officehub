@@ -55,6 +55,10 @@ export async function GET(req: Request) {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
     if (authError || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
 
+    const { data: profile } = await supabaseAdmin.from("profiles").select("role, department_id, departments(name)").eq("id", user.id).single()
+    const isAdmin = profile?.role === "admin"
+    const userDeptName = profile?.departments?.name
+
     const { searchParams } = new URL(req.url)
     const folderId = searchParams.get("folder_id")
     const searchQuery = searchParams.get("search")
@@ -75,6 +79,15 @@ export async function GET(req: Request) {
 
     if (searchQuery) {
       query = query.ilike('name', `%${searchQuery}%`)
+    }
+
+    if (!isAdmin && !folderId) {
+      // If filtering at root or searching globally, restrict by department
+      if (userDeptName) {
+        query = query.in("department", ["Chung", userDeptName])
+      } else {
+        query = query.eq("department", "Chung")
+      }
     }
 
     const { data, error } = await query
