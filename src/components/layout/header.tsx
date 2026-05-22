@@ -170,11 +170,9 @@ export function Header() {
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b border-primary-foreground/20 bg-primary text-primary-foreground px-4 sm:h-16 sm:px-6 shadow-sm relative">
       {/* Mobile Menu Trigger */}
       <Sheet>
-        <SheetTrigger asChild>
-          <Button size="icon" variant="outline" className="sm:hidden border-primary-foreground/20 bg-transparent hover:bg-primary-foreground/10 text-primary-foreground hover:text-white">
-            <Menu className="h-5 w-5" />
-            <span className="sr-only">Toggle Menu</span>
-          </Button>
+        <SheetTrigger className="sm:hidden border border-primary-foreground/20 bg-transparent hover:bg-primary-foreground/10 text-primary-foreground hover:text-white inline-flex items-center justify-center rounded-md h-9 w-9 shrink-0">
+          <Menu className="h-5 w-5" />
+          <span className="sr-only">Toggle Menu</span>
         </SheetTrigger>
         <SheetContent side="left" className="w-[300px] bg-primary text-primary-foreground border-r-primary-foreground/20 p-0 flex flex-col sm:hidden">
           <div className="flex w-full items-center justify-center border-b border-primary-foreground/20 py-4">
