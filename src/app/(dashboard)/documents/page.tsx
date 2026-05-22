@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -12,10 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { 
-  FileIcon, Search, Upload, Download, Loader2, Folder as FolderIcon, 
-  Plus, ChevronLeft, Eye, FileText, ImageIcon, FileSpreadsheet, FileIcon as FilePdf, Trash2, Edit2, Pin, LayoutGrid, List
-} from "lucide-react"
+import { FileIcon, Search, Upload, Download, Loader2, Folder as FolderIcon, Plus, ChevronLeft, Eye, FileText, ImageIcon, FileSpreadsheet, FileIcon as FilePdf, Trash2, Edit2, Pin, LayoutGrid, List, ArrowUp, ArrowDown } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 import { supabase } from "@/lib/supabase/client"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
@@ -77,6 +74,80 @@ export default function DocumentsPage() {
   const [editingFolder, setEditingFolder] = useState<FolderType | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table')
+  
+  type SortConfig = { key: 'name' | 'created_at' | 'size' | 'department', direction: 'asc' | 'desc' } | null;
+  const [sortConfig, setSortConfig] = useState<SortConfig>(null);
+
+  const handleSort = (key: 'name' | 'created_at' | 'size' | 'department') => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  }
+
+  const parseSize = (sizeStr: string) => {
+    if (!sizeStr || sizeStr === '-') return 0;
+    const match = sizeStr.match(/([\d.]+)\s*(Bytes|KB|MB|GB)/i);
+    if (!match) return 0;
+    const val = parseFloat(match[1]);
+    const unit = match[2].toUpperCase();
+    const multipliers: any = { 'BYTES': 1, 'KB': 1024, 'MB': 1024*1024, 'GB': 1024*1024*1024 };
+    return val * (multipliers[unit] || 1);
+  }
+
+  const sortedFolders: FolderType[] = useMemo(() => {
+    let sortableFolders = [...folders];
+    if (sortConfig) {
+      sortableFolders.sort((a, b) => {
+        if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
+        if (sortConfig.key === 'name') {
+          return sortConfig.direction === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+        }
+        if (sortConfig.key === 'department') {
+          const deptA = a.department || "Chung";
+          const deptB = b.department || "Chung";
+          return sortConfig.direction === 'asc' ? deptA.localeCompare(deptB) : deptB.localeCompare(deptA);
+        }
+        if (sortConfig.key === 'created_at') {
+          return sortConfig.direction === 'asc' ? new Date(a.created_at).getTime() - new Date(b.created_at).getTime() : new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        }
+        return 0;
+      });
+    }
+    return sortableFolders;
+  }, [folders, sortConfig]);
+
+  const sortedFiles: DocumentType[] = useMemo(() => {
+    let sortableFiles = [...files];
+    if (sortConfig) {
+      sortableFiles.sort((a, b) => {
+        if (sortConfig.key === 'name') {
+          return sortConfig.direction === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+        }
+        if (sortConfig.key === 'department') {
+          const deptA = a.department || "Chung";
+          const deptB = b.department || "Chung";
+          return sortConfig.direction === 'asc' ? deptA.localeCompare(deptB) : deptB.localeCompare(deptA);
+        }
+        if (sortConfig.key === 'created_at') {
+          return sortConfig.direction === 'asc' ? new Date(a.created_at).getTime() - new Date(b.created_at).getTime() : new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        }
+        if (sortConfig.key === 'size') {
+          const sizeA = parseSize(a.size);
+          const sizeB = parseSize(b.size);
+          return sortConfig.direction === 'asc' ? sizeA - sizeB : sizeB - sizeA;
+        }
+        return 0;
+      });
+    }
+    return sortableFiles;
+  }, [files, sortConfig]);
+
+  const SortIcon = ({ columnKey }: { columnKey: string }) => {
+    if (sortConfig?.key !== columnKey) return null;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="inline w-3 h-3 ml-1" /> : <ArrowDown className="inline w-3 h-3 ml-1" />;
+  }
   const [editFolderName, setEditFolderName] = useState("")
   const [editFolderDepartment, setEditFolderDepartment] = useState("Chung")
   const [isSavingFolderEdit, setIsSavingFolderEdit] = useState(false)
@@ -618,10 +689,10 @@ export default function DocumentsPage() {
           <Table>
           <TableHeader className="bg-muted/50">
             <TableRow>
-              <TableHead>Tên tài liệu / Thư mục</TableHead>
-              <TableHead>Phòng ban</TableHead>
-              <TableHead>Ngày tạo</TableHead>
-              <TableHead>Kích thước</TableHead>
+              <TableHead onClick={() => handleSort('name')} className="cursor-pointer hover:text-primary select-none">Tên tài liệu / Thư mục <SortIcon columnKey="name" /></TableHead>
+              <TableHead onClick={() => handleSort('department')} className="cursor-pointer hover:text-primary select-none">Phòng ban <SortIcon columnKey="department" /></TableHead>
+              <TableHead onClick={() => handleSort('created_at')} className="cursor-pointer hover:text-primary select-none">Ngày tạo <SortIcon columnKey="created_at" /></TableHead>
+              <TableHead onClick={() => handleSort('size')} className="cursor-pointer hover:text-primary select-none">Kích thước <SortIcon columnKey="size" /></TableHead>
               <TableHead className="w-[100px] text-right">Thao tác</TableHead>
             </TableRow>
           </TableHeader>
@@ -641,7 +712,7 @@ export default function DocumentsPage() {
             ) : (
               <>
                 {/* Render Folders (only if not searching and no current folder) */}
-                {!isSearching && !currentFolder && folders
+                {!isSearching && !currentFolder && sortedFolders
                   .filter(f => filterDept === "all" ? true : (f.department || "Chung") === filterDept)
                   .map((folder) => (
                   <TableRow 
@@ -691,7 +762,7 @@ export default function DocumentsPage() {
                 ))}
 
                 {/* Render Files */}
-                {files
+                {sortedFiles
                   .filter(f => filterDept === "all" || currentFolder ? true : (f.department || "Chung") === filterDept)
                   .map((file) => (
                   <TableRow key={file.id} className="hover:bg-muted/30">
@@ -769,7 +840,7 @@ export default function DocumentsPage() {
                 </div>
              ) : (
                 <>
-                  {!isSearching && !currentFolder && folders
+                  {!isSearching && !currentFolder && sortedFolders
                     .filter(f => filterDept === "all" ? true : (f.department || "Chung") === filterDept)
                     .map(folder => (
                     <div key={folder.id} onClick={() => setCurrentFolder(folder)} className="border rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 hover:border-primary/50 transition-colors group relative bg-card shadow-sm">
@@ -803,7 +874,7 @@ export default function DocumentsPage() {
                     </div>
                   ))}
                   
-                  {files
+                  {sortedFiles
                     .filter(f => filterDept === "all" || currentFolder ? true : (f.department || "Chung") === filterDept)
                     .map(file => (
                     <div key={file.id} onClick={() => setPreviewFile(file)} className="border rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 hover:border-primary/50 transition-colors group relative bg-card shadow-sm">
