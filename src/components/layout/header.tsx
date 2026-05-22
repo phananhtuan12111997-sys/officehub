@@ -15,7 +15,9 @@ import {
   DropdownMenuTrigger,
   DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Home, ShieldAlert } from "lucide-react"
 import { supabase } from "@/lib/supabase/client"
 
 export function Header() {
@@ -167,10 +169,45 @@ export function Header() {
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b border-primary-foreground/20 bg-primary text-primary-foreground px-4 sm:h-16 sm:px-6 shadow-sm relative">
       {/* Mobile Menu Trigger */}
-      <Button size="icon" variant="outline" className="sm:hidden border-primary-foreground/20 bg-transparent hover:bg-primary-foreground/10 text-primary-foreground hover:text-white">
-        <Menu className="h-5 w-5" />
-        <span className="sr-only">Toggle Menu</span>
-      </Button>
+      <Sheet>
+        <SheetTrigger asChild>
+          <Button size="icon" variant="outline" className="sm:hidden border-primary-foreground/20 bg-transparent hover:bg-primary-foreground/10 text-primary-foreground hover:text-white">
+            <Menu className="h-5 w-5" />
+            <span className="sr-only">Toggle Menu</span>
+          </Button>
+        </SheetTrigger>
+        <SheetContent side="left" className="w-[300px] bg-primary text-primary-foreground border-r-primary-foreground/20 p-0 flex flex-col sm:hidden">
+          <div className="flex w-full items-center justify-center border-b border-primary-foreground/20 py-4">
+            <Link href="/" className="flex items-center">
+              <img src="/logo.png" alt="OfficeHub Logo" className="h-10 object-contain" />
+            </Link>
+          </div>
+          <div className="flex-1 overflow-auto py-4">
+            <nav className="grid items-start px-2 text-sm font-medium gap-1">
+              <Link href="/" className="flex items-center gap-3 rounded-lg px-3 py-2 text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10">
+                <Home className="h-4 w-4" /> Bảng tin
+              </Link>
+              <Link href="/documents" className="flex items-center gap-3 rounded-lg px-3 py-2 text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10">
+                <FileText className="h-4 w-4" /> Tài liệu
+              </Link>
+              <Link href="/tasks" className="flex items-center gap-3 rounded-lg px-3 py-2 text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10">
+                <CheckSquare className="h-4 w-4" /> Công việc
+              </Link>
+              <Link href="/inbox" className="flex items-center gap-3 rounded-lg px-3 py-2 text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10">
+                <Mail className="h-4 w-4" /> Hộp thư
+              </Link>
+              {profile?.role === "admin" && (
+                <>
+                  <div className="mt-4 px-3 text-xs font-semibold uppercase tracking-wider text-primary-foreground/60">Quản trị</div>
+                  <Link href="/admin" className="flex items-center gap-3 rounded-lg px-3 py-2 text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10">
+                    <ShieldAlert className="h-4 w-4" /> Nhân sự
+                  </Link>
+                </>
+              )}
+            </nav>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Mobile Title */}
       <div className="flex-1 sm:hidden">
