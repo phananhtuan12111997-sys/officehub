@@ -1,23 +1,31 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Clock, Plus, ArrowRight, Loader2, MessageSquare } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Clock, Plus, ArrowRight, Loader2, Paperclip, FileIcon } from "lucide-react"
 import { supabase } from "@/lib/supabase/client"
 import { Comments } from "@/components/ui/comments"
 
 type TaskType = {
   id: string
   title: string
+  description?: string
   assignee: string
+  assignee_id?: string
+  department_id?: string
+  priority: string
   due_date: string
+  due_date_timestamp?: string
   status: string
   created_at: string
+  attachments?: any[]
 }
 
 const COLUMNS = [
@@ -32,19 +40,42 @@ export default function TasksPage() {
   const [showForm, setShowForm] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   
-  const [title, setTitle] = useState("")
-  const [assigneeId, setAssigneeId] = useState("")
-  const [dueDate, setDueDate] = useState("")
+  // Data lists
   const [users, setUsers] = useState<any[]>([])
+  const [departments, setDepartments] = useState<any[]>([])
+
+  // Form State
+  const [title, setTitle] = useState("")
+  const [description, setDescription] = useState("")
+  const [assigneeId, setAssigneeId] = useState("")
+  const [departmentId, setDepartmentId] = useState("")
+  const [priority, setPriority] = useState("medium")
+  const [dueDate, setDueDate] = useState("")
+  const [files, setFiles] = useState<File[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Detail Modal State
+  const [selectedTask, setSelectedTask] = useState<TaskType | null>(null)
+
+  useEffect(() => {
+    fetchTasks()
+    fetchUsers()
+    fetchDepartments()
+  }, [])
 
   const fetchUsers = async () => {
     const { data } = await supabase.from('profiles').select('*')
     if (data) setUsers(data)
   }
 
+  const fetchDepartments = async () => {
+    const { data } = await supabase.from('departments').select('*')
+    if (data) setDepartments(data)
+  }
+
   const fetchTasks = async () => {
     setLoading(true)
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('tasks')
       .select('*')
       .order('created_at', { ascending: false })
@@ -53,33 +84,105 @@ export default function TasksPage() {
     setLoading(false)
   }
 
-  useEffect(() => {
-    fetchTasks()
-    fetchUsers()
-  }, [])
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const selectedFiles = Array.from(e.target.files)
+      setFiles(prev => [...prev, ...selectedFiles])
+    }
+  }
+
+  const uploadFiles = async () => {
+    const uploadedAttachments = []
+    for (const file of files) {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Math.random()}.${fileExt}`
+      const filePath = `tasks/${fileName}`
+
+      const { error } = await supabase.storage
+        .from('task_files')
+        .upload(filePath, file)
+
+      if (!error) {
+        const { data } = supabase.storage.from('task_files').getPublicUrl(filePath)
+        uploadedAttachments.push({
+          name: file.name,
+          url: data.publicUrl,
+          path: filePath
+        })
+      }
+    }
+    return uploadedAttachments
+  }
 
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title) return
     setIsSubmitting(true)
     
+    const uploadedAttachments = await uploadFiles()
+
     const selectedUser = users.find(u => u.id === assigneeId)
-    const { error } = await supabase
+    const selectedDept = departments.find(d => d.id === departmentId)
+
+    let assigneeName = "Chưa phân công"
+    if (selectedUser) assigneeName = selectedUser.full_name
+    else if (selectedDept) assigneeName = `Phòng: ${selectedDept.name}`
+
+    const { error, data: newTask } = await supabase
       .from('tasks')
       .insert({
         title,
-        assignee: selectedUser ? selectedUser.full_name : "Chưa phân công",
+        description,
+        assignee: assigneeName,
         assignee_id: assigneeId || null,
-        due_date: dueDate || "Không có hạn",
-        status: 'new'
+        department_id: departmentId || null,
+        priority,
+        due_date: dueDate || "Không có hạn", // Fallback for old UI text if needed
+        due_date_timestamp: dueDate ? new Date(dueDate).toISOString() : null,
+        status: 'new',
+        attachments: uploadedAttachments
       })
+      .select()
+      .single()
 
     if (error) {
       alert("Lỗi giao việc: " + error.message)
     } else {
+      // Send notifications
+      const { data: { session } } = await supabase.auth.getSession()
+      const currentUserProfile = users.find(u => u.id === session?.user.id)
+      const senderName = currentUserProfile ? currentUserProfile.full_name : 'Ai đó'
+
+      if (assigneeId) {
+        await supabase.from('notifications').insert({
+          user_id: assigneeId,
+          title: 'Công việc mới',
+          message: `${senderName} vừa giao cho bạn một công việc: ${title}`,
+          link: `/tasks`,
+          type: 'system'
+        })
+      } else if (departmentId) {
+        const deptUsers = users.filter(u => u.department_id === departmentId)
+        const notifications = deptUsers.map(u => ({
+          user_id: u.id,
+          title: 'Công việc mới cho phòng ban',
+          message: `${senderName} vừa giao việc cho phòng ${selectedDept?.name}: ${title}`,
+          link: `/tasks`,
+          type: 'system'
+        }))
+        if (notifications.length > 0) {
+          await supabase.from('notifications').insert(notifications)
+        }
+      }
+
       setTitle("")
+      setDescription("")
       setAssigneeId("")
+      setDepartmentId("")
+      setPriority("medium")
       setDueDate("")
+      setFiles([])
+      if (fileInputRef.current) fileInputRef.current.value = ""
       setShowForm(false)
       fetchTasks()
     }
@@ -90,7 +193,7 @@ export default function TasksPage() {
     let nextStatus = 'new'
     if (currentStatus === 'new' || currentStatus === 'in-progress') nextStatus = 'review'
     else if (currentStatus === 'review') nextStatus = 'done'
-    else if (currentStatus === 'done') nextStatus = 'new' // Vòng lặp test
+    else if (currentStatus === 'done') nextStatus = 'new'
 
     const { error } = await supabase
       .from('tasks')
@@ -98,16 +201,32 @@ export default function TasksPage() {
       .eq('id', id)
       
     if (!error) {
-      fetchTasks() // Refresh list
+      fetchTasks()
+    }
+  }
+
+  const getPriorityColor = (p: string) => {
+    switch (p) {
+      case 'high': return 'bg-red-500/10 text-red-600 border-red-200'
+      case 'low': return 'bg-green-500/10 text-green-600 border-green-200'
+      default: return 'bg-yellow-500/10 text-yellow-600 border-yellow-200'
+    }
+  }
+
+  const getPriorityLabel = (p: string) => {
+    switch (p) {
+      case 'high': return 'Cao'
+      case 'low': return 'Thấp'
+      default: return 'Trung bình'
     }
   }
 
   return (
-    <div className="flex flex-col gap-6 max-w-6xl mx-auto h-[calc(100vh-8rem)]">
+    <div className="flex flex-col gap-6 max-w-7xl mx-auto h-[calc(100vh-8rem)]">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Công việc</h1>
-          <p className="text-muted-foreground">Theo dõi tiến độ các đầu việc được giao.</p>
+          <p className="text-muted-foreground">Theo dõi và giao việc cá nhân, phòng ban.</p>
         </div>
         <Button onClick={() => setShowForm(!showForm)} className="flex items-center gap-2">
           <Plus className="w-4 h-4" />
@@ -122,9 +241,9 @@ export default function TasksPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleCreateTask} className="flex flex-col gap-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium">Tên công việc</label>
+                  <label className="text-sm font-medium">Tiêu đề công việc</label>
                   <Input 
                     placeholder="Vd: Chuẩn bị hợp đồng..." 
                     value={title}
@@ -133,8 +252,42 @@ export default function TasksPage() {
                   />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium">Người nhận</label>
-                  <Select value={assigneeId} onValueChange={(val) => setAssigneeId(val || "")}>
+                  <label className="text-sm font-medium">Hạn chót</label>
+                  <Input 
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium">Mô tả chi tiết (Tùy chọn)</label>
+                <Textarea 
+                  placeholder="Viết chi tiết các yêu cầu công việc tại đây..." 
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium">Mức độ ưu tiên</label>
+                  <Select value={priority} onValueChange={setPriority}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Ưu tiên" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Thấp</SelectItem>
+                      <SelectItem value="medium">Trung bình</SelectItem>
+                      <SelectItem value="high">Cao</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium">Giao cho Cá nhân</label>
+                  <Select value={assigneeId} onValueChange={(val) => { setAssigneeId(val); setDepartmentId(""); }}>
                     <SelectTrigger>
                       <SelectValue placeholder="Chọn người nhận" />
                     </SelectTrigger>
@@ -146,15 +299,39 @@ export default function TasksPage() {
                   </Select>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium">Hạn chót</label>
-                  <Input 
-                    placeholder="Vd: Hôm nay, Ngày mai..." 
-                    value={dueDate}
-                    onChange={(e) => setDueDate(e.target.value)}
-                  />
+                  <label className="text-sm font-medium">HOẶC Giao cho Phòng ban</label>
+                  <Select value={departmentId} onValueChange={(val) => { setDepartmentId(val); setAssigneeId(""); }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Chọn phòng ban" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departments.map(d => (
+                        <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
-              <div className="flex justify-end gap-2 mt-2">
+
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium">Đính kèm tài liệu</label>
+                <div className="flex items-center gap-2">
+                  <Input 
+                    type="file" 
+                    multiple 
+                    onChange={handleFileChange}
+                    ref={fileInputRef}
+                    className="w-full sm:w-1/2"
+                  />
+                </div>
+                {files.length > 0 && (
+                  <div className="text-sm text-muted-foreground mt-1">
+                    Đã chọn {files.length} tệp.
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
                 <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Hủy</Button>
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -179,7 +356,7 @@ export default function TasksPage() {
             )
             
             return (
-              <div key={col.id} className="min-w-[300px] w-[350px] flex flex-col gap-4">
+              <div key={col.id} className="min-w-[320px] w-[350px] flex flex-col gap-4">
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold">{col.title}</h3>
                   <Badge variant="secondary">{colTasks.length}</Badge>
@@ -192,27 +369,36 @@ export default function TasksPage() {
                     </div>
                   )}
                   {colTasks.map((task) => (
-                    <Card key={task.id} className="shadow-sm border border-border/50">
+                    <Card key={task.id} className="shadow-sm border border-border/50 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setSelectedTask(task)}>
                       <CardHeader className="p-4 pb-2">
                         <div className="flex justify-between items-start gap-2">
                           <CardTitle className="text-base leading-tight">{task.title}</CardTitle>
                         </div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <Badge variant="outline" className={`text-xs px-1 ${getPriorityColor(task.priority)}`}>
+                            {getPriorityLabel(task.priority)}
+                          </Badge>
+                          {task.attachments && task.attachments.length > 0 && (
+                            <Badge variant="outline" className="text-xs px-1 flex items-center gap-1">
+                              <Paperclip className="w-3 h-3" /> {task.attachments.length}
+                            </Badge>
+                          )}
+                        </div>
                       </CardHeader>
                       <CardContent className="p-4 pt-2 pb-2">
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
                           <Clock className="w-3.5 h-3.5" />
-                          <span>{task.due_date}</span>
+                          <span>{task.due_date_timestamp ? new Date(task.due_date_timestamp).toLocaleDateString('vi-VN') : task.due_date}</span>
                         </div>
-                        <Comments taskId={task.id} />
                       </CardContent>
-                      <CardFooter className="p-4 pt-0 flex justify-between items-center mt-2 border-t pt-3 border-border/50">
+                      <CardFooter className="p-4 pt-0 flex justify-between items-center mt-2 border-t pt-3 border-border/50" onClick={(e) => e.stopPropagation()}>
                         <Avatar className="w-6 h-6">
                           <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
                             {task.assignee.substring(0, 2).toUpperCase() || "??"}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground truncate max-w-[100px]">{task.assignee}</span>
+                          <span className="text-xs text-muted-foreground truncate max-w-[120px]" title={task.assignee}>{task.assignee}</span>
                           <Button 
                             variant="ghost" 
                             size="icon" 
@@ -232,6 +418,67 @@ export default function TasksPage() {
           })}
         </div>
       )}
+
+      {/* TASK DETAIL MODAL */}
+      <Dialog open={!!selectedTask} onOpenChange={(open) => !open && setSelectedTask(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex items-center gap-2 mb-2">
+              <Badge variant="outline" className={getPriorityColor(selectedTask?.priority || "medium")}>
+                Ưu tiên {getPriorityLabel(selectedTask?.priority || "medium")}
+              </Badge>
+              <Badge variant="secondary">{COLUMNS.find(c => c.id === (selectedTask?.status === 'in-progress' ? 'new' : selectedTask?.status))?.title}</Badge>
+            </div>
+            <DialogTitle className="text-xl">{selectedTask?.title}</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            <div className="grid grid-cols-2 gap-4 text-sm bg-muted/30 p-4 rounded-lg">
+              <div>
+                <span className="text-muted-foreground block mb-1">Người nhận:</span>
+                <span className="font-medium">{selectedTask?.assignee}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground block mb-1">Hạn chót:</span>
+                <span className="font-medium flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5" />
+                  {selectedTask?.due_date_timestamp ? new Date(selectedTask.due_date_timestamp).toLocaleDateString('vi-VN') : selectedTask?.due_date}
+                </span>
+              </div>
+            </div>
+
+            {selectedTask?.description && (
+              <div>
+                <h4 className="font-semibold mb-2">Mô tả công việc</h4>
+                <div className="text-sm whitespace-pre-wrap bg-background p-4 border rounded-lg">
+                  {selectedTask.description}
+                </div>
+              </div>
+            )}
+
+            {selectedTask?.attachments && selectedTask.attachments.length > 0 && (
+              <div>
+                <h4 className="font-semibold mb-2 flex items-center gap-2">
+                  <Paperclip className="w-4 h-4" /> Tệp đính kèm ({selectedTask.attachments.length})
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {selectedTask.attachments.map((file, idx) => (
+                    <a key={idx} href={file.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 border rounded-md hover:bg-muted transition-colors text-sm">
+                      <FileIcon className="w-4 h-4 text-primary" />
+                      <span className="truncate flex-1" title={file.name}>{file.name}</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="pt-4 border-t">
+              <h4 className="font-semibold mb-4">Thảo luận</h4>
+              {selectedTask && <Comments taskId={selectedTask.id} />}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

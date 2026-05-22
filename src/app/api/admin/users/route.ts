@@ -46,7 +46,7 @@ export async function POST(req: Request) {
   if (!isAdmin) return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
 
   const body = await req.json()
-  const { email, password, full_name, role } = body
+  const { email, password, full_name, role, department_id } = body
 
   // Tạo auth user bằng Admin API
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -62,7 +62,7 @@ export async function POST(req: Request) {
   if (authData.user) {
     const { error: profileError } = await supabaseAdmin
       .from("profiles")
-      .update({ full_name, role: role || "staff" })
+      .update({ full_name, role: role || "staff", department_id })
       .eq("id", authData.user.id)
 
     if (profileError) return NextResponse.json({ error: profileError.message }, { status: 400 })
@@ -76,12 +76,13 @@ export async function PATCH(req: Request) {
   if (!isAdmin) return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
 
   const body = await req.json()
-  const { id, role, full_name, password } = body
+  const { id, role, full_name, password, department_id } = body
 
   // Update profile
   const updateData: any = {}
-  if (role) updateData.role = role
-  if (full_name) updateData.full_name = full_name
+  if (role !== undefined) updateData.role = role
+  if (full_name !== undefined) updateData.full_name = full_name
+  if (department_id !== undefined) updateData.department_id = department_id
 
   if (Object.keys(updateData).length > 0) {
     const { error } = await supabaseAdmin
