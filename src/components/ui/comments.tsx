@@ -102,12 +102,13 @@ export function Comments({ postId, taskId }: { postId?: string, taskId?: string 
 
       if (comment && comment.author_id !== user.id) {
         const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single()
+        const notifLink = postId ? `/post/${postId}` : (taskId ? `/tasks` : `/`)
         await supabase.from('notifications').insert({
           user_id: comment.author_id,
           title: 'Có người thích bình luận',
           message: `${profile?.full_name || 'Ai đó'} đã thích bình luận của bạn.`,
           type: 'reaction',
-          link: '/'
+          link: notifLink
         })
       }
     }
