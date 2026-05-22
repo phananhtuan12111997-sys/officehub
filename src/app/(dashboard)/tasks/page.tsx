@@ -274,7 +274,7 @@ export default function TasksPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium">Mức độ ưu tiên</label>
-                  <Select value={priority} onValueChange={setPriority}>
+                  <Select value={priority} onValueChange={(val) => setPriority(val || "medium")}>
                     <SelectTrigger>
                       <SelectValue placeholder="Ưu tiên" />
                     </SelectTrigger>
