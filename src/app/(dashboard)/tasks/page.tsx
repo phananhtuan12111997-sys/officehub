@@ -9,9 +9,12 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Clock, Plus, ArrowRight, Loader2, Paperclip, FileIcon } from "lucide-react"
+import { Clock, Plus, ArrowRight, Loader2, Paperclip, FileIcon, ChevronsUpDown, Check } from "lucide-react"
 import { supabase } from "@/lib/supabase/client"
 import { Comments } from "@/components/ui/comments"
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
 
 type TaskType = {
   id: string
@@ -52,6 +55,7 @@ export default function TasksPage() {
   const [priority, setPriority] = useState("medium")
   const [dueDate, setDueDate] = useState("")
   const [files, setFiles] = useState<File[]>([])
+  const [openUserCombo, setOpenUserCombo] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Detail Modal State
@@ -286,21 +290,51 @@ export default function TasksPage() {
                   </Select>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium">Giao cho Cá nhân</label>
-                  <Select value={assigneeId} onValueChange={(val) => { setAssigneeId(val); setDepartmentId(""); }}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Chọn người nhận" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {users.map(u => (
-                        <SelectItem key={u.id} value={u.id}>{u.full_name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <label className="text-sm font-medium">Chọn người nhận</label>
+                  <Popover open={openUserCombo} onOpenChange={setOpenUserCombo}>
+                    <PopoverTrigger className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm hover:bg-accent hover:text-accent-foreground font-normal">
+                      {assigneeId
+                        ? users.find((user) => user.id === assigneeId)?.full_name
+                        : "Chọn người nhận..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[300px] p-0">
+                      <Command>
+                        <CommandInput placeholder="Tìm tên hoặc email..." />
+                        <CommandList>
+                          <CommandEmpty>Không tìm thấy nhân viên.</CommandEmpty>
+                          <CommandGroup>
+                            {users.map((user) => (
+                              <CommandItem
+                                key={user.id}
+                                value={user.full_name + ' ' + user.email}
+                                onSelect={() => {
+                                  setAssigneeId(user.id === assigneeId ? "" : user.id)
+                                  setDepartmentId("")
+                                  setOpenUserCombo(false)
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    assigneeId === user.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                <div className="flex flex-col">
+                                  <span>{user.full_name}</span>
+                                  <span className="text-xs text-muted-foreground">{user.email}</span>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium">HOẶC Giao cho Phòng ban</label>
-                  <Select value={departmentId} onValueChange={(val) => { setDepartmentId(val); setAssigneeId(""); }}>
+                  <label className="text-sm font-medium">Giao cho Phòng ban</label>
+                  <Select value={departmentId} onValueChange={(val) => { setDepartmentId(val || ""); setAssigneeId(""); }}>
                     <SelectTrigger>
                       <SelectValue placeholder="Chọn phòng ban" />
                     </SelectTrigger>
@@ -316,12 +350,20 @@ export default function TasksPage() {
               <div className="flex flex-col gap-2">
                 <label className="text-sm font-medium">Đính kèm tài liệu</label>
                 <div className="flex items-center gap-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Paperclip className="w-4 h-4 mr-2" />
+                    Chọn tệp
+                  </Button>
                   <Input 
                     type="file" 
                     multiple 
                     onChange={handleFileChange}
                     ref={fileInputRef}
-                    className="w-full sm:w-1/2"
+                    className="hidden"
                   />
                 </div>
                 {files.length > 0 && (
