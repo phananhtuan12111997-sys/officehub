@@ -628,11 +628,15 @@ export default function TasksPage() {
                   rows={3}
                 />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium">Mức độ ưu tiên</label>
                   <Select value={editTaskData.priority || "medium"} onValueChange={(val) => setEditTaskData({...editTaskData, priority: val || "medium"})}>
-                    <SelectTrigger><SelectValue placeholder="Ưu tiên" /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Ưu tiên">
+                        {editTaskData.priority === 'high' ? 'Cao' : editTaskData.priority === 'low' ? 'Thấp' : 'Trung bình'}
+                      </SelectValue>
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="low">Thấp</SelectItem>
                       <SelectItem value="medium">Trung bình</SelectItem>
@@ -643,7 +647,11 @@ export default function TasksPage() {
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium">Giao cho cá nhân</label>
                   <Select value={editTaskData.assignee_id || "none"} onValueChange={(val) => setEditTaskData({...editTaskData, assignee_id: val === "none" ? "" : (val || ""), department_id: ""})}>
-                    <SelectTrigger><SelectValue placeholder="Chọn người" /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Chọn người">
+                        {editTaskData.assignee_id && editTaskData.assignee_id !== "none" ? users.find(u => u.id === editTaskData.assignee_id)?.full_name : "Không chọn"}
+                      </SelectValue>
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Không chọn</SelectItem>
                       {users.map(u => (
@@ -655,7 +663,11 @@ export default function TasksPage() {
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium">Phòng ban</label>
                   <Select value={editTaskData.department_id || "none"} onValueChange={(val) => setEditTaskData({...editTaskData, department_id: val === "none" ? "" : (val || ""), assignee_id: ""})}>
-                    <SelectTrigger><SelectValue placeholder="Chọn phòng" /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Chọn phòng">
+                        {editTaskData.department_id && editTaskData.department_id !== "none" ? departments.find(d => d.id === editTaskData.department_id)?.name : "Không chọn"}
+                      </SelectValue>
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Không chọn</SelectItem>
                       {departments.map(d => (
