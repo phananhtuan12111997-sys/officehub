@@ -34,22 +34,45 @@ export function Header() {
   // Notifications state
   const [notifications, setNotifications] = useState<any[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
+  const notificationLimitRef = useRef(20)
+  const [hasMoreNotifications, setHasMoreNotifications] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
 
   // Mobile menu state
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const fetchNotifications = async (userId: string) => {
-    const { data } = await supabase
+    const { data, count } = await supabase
       .from('notifications')
-      .select('*')
+      .select('*', { count: 'exact' })
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
-      .limit(20)
+      .limit(notificationLimitRef.current)
     
     if (data) {
       setNotifications(data)
-      setUnreadCount(data.filter(n => !n.is_read).length)
+      setHasMoreNotifications(count ? count > data.length : false)
     }
+
+    const { count: unread } = await supabase
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('is_read', false)
+    
+    if (unread !== null) {
+      setUnreadCount(unread)
+    }
+  }
+
+  const loadMoreNotifications = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!profile || isLoadingMore) return
+    setIsLoadingMore(true)
+    notificationLimitRef.current += 20
+    await fetchNotifications(profile.id)
+    setIsLoadingMore(false)
   }
 
   const handleReadNotification = async (notification: any) => {
@@ -368,6 +391,19 @@ export function Header() {
                     <span className="text-[10px] text-muted-foreground/70 mt-0.5">{new Date(n.created_at).toLocaleString('vi-VN')}</span>
                   </DropdownMenuItem>
                 ))
+              )}
+              {hasMoreNotifications && notifications.length > 0 && (
+                <div className="p-2 border-t mt-1">
+                  <Button 
+                    variant="ghost" 
+                    className="w-full text-xs text-primary hover:text-primary hover:bg-primary/10 h-8" 
+                    onClick={loadMoreNotifications}
+                    disabled={isLoadingMore}
+                  >
+                    {isLoadingMore ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : null}
+                    Xem thông báo trước đó
+                  </Button>
+                </div>
               )}
             </div>
           </DropdownMenuContent>
