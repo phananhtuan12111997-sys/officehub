@@ -71,7 +71,7 @@ export function FilePreview({ open, onOpenChange, file }: FilePreviewProps) {
     
     if (ext === 'pdf') {
       return (
-        <div className="w-full h-[75vh] rounded-md overflow-hidden border">
+        <div className="w-full h-full min-h-[50vh] rounded-md overflow-hidden border">
           <iframe src={file.url} className="w-full h-full" title={file.name} />
         </div>
       )
@@ -80,7 +80,7 @@ export function FilePreview({ open, onOpenChange, file }: FilePreviewProps) {
     if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) {
       const googleViewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(file.url)}&embedded=true`
       return (
-        <div className="w-full h-[75vh] rounded-md overflow-hidden border bg-white">
+        <div className="w-full h-full min-h-[50vh] rounded-md overflow-hidden border bg-white">
           <iframe src={googleViewerUrl} className="w-full h-full" title={file.name} />
         </div>
       )
@@ -122,10 +122,10 @@ export function FilePreview({ open, onOpenChange, file }: FilePreviewProps) {
       if (!isOpen) handleClose()
     }}>
       <DialogContent 
-        className="sm:max-w-4xl w-[95vw] p-0 overflow-hidden flex flex-col gap-0 border-primary/20 shadow-xl h-[95vh] sm:h-[85vh] max-h-[95vh]"
+        className="sm:max-w-4xl w-[95vw] p-0 overflow-hidden flex flex-col gap-0 border-primary/20 shadow-xl h-[90vh] sm:h-[85vh] max-h-[90vh]"
         showCloseButton={false}
       >
-        <DialogHeader className="p-2 sm:p-4 border-b bg-muted/30 flex flex-row items-center justify-between space-y-0 relative z-10">
+        <DialogHeader className="p-2 sm:p-4 border-b bg-muted/30 flex flex-row items-center justify-between space-y-0 relative z-10 shrink-0">
           <div className="flex items-center gap-2 sm:gap-3 overflow-hidden flex-1 mr-2">
             <Button 
               variant="ghost" 
