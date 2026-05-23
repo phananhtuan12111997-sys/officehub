@@ -359,10 +359,16 @@ export function Header() {
         {/* Notification Bell */}
         <DropdownMenu onOpenChange={(open) => {
           if (open) {
+            // First attempt
             setTimeout(() => {
               const container = document.getElementById('notification-scroll-container');
               if (container) container.scrollTop = 0;
-            }, 0);
+            }, 100);
+            // Fallback for slower mobile rendering
+            setTimeout(() => {
+              const container = document.getElementById('notification-scroll-container');
+              if (container) container.scrollTop = 0;
+            }, 300);
           }
         }}>
           <DropdownMenuTrigger className="relative inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-primary-foreground/10 hover:text-white h-9 w-9 text-primary-foreground">
