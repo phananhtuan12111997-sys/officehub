@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { useEffect, useState, useRef } from "react"
 import { Menu, Search, User, FileText, CheckSquare, Loader2, Bell } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -40,6 +40,16 @@ export function Header() {
 
   // Mobile menu state
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const pathname = usePathname()
+
+  const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    if (pathname === href || (href === '/inbox' && pathname.startsWith('/inbox'))) {
+      e.preventDefault()
+      window.location.href = href
+    } else {
+      setIsMobileMenuOpen(false)
+    }
+  }
 
   const fetchNotifications = async (userId: string) => {
     const { data, count } = await supabase
@@ -208,22 +218,22 @@ export function Header() {
           </div>
           <div className="flex-1 overflow-auto py-4">
             <nav className="grid items-start px-2 text-sm font-medium gap-1">
-              <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2 text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10">
+              <Link href="/" onClick={(e) => handleLinkClick(e, "/")} className="flex items-center gap-3 rounded-lg px-3 py-2 text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10">
                 <Home className="h-4 w-4" /> Bảng tin
               </Link>
-              <Link href="/documents" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2 text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10">
+              <Link href="/documents" onClick={(e) => handleLinkClick(e, "/documents")} className="flex items-center gap-3 rounded-lg px-3 py-2 text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10">
                 <FileText className="h-4 w-4" /> Tài liệu
               </Link>
-              <Link href="/tasks" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2 text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10">
+              <Link href="/tasks" onClick={(e) => handleLinkClick(e, "/tasks")} className="flex items-center gap-3 rounded-lg px-3 py-2 text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10">
                 <CheckSquare className="h-4 w-4" /> Công việc
               </Link>
-              <Link href="/inbox" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2 text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10">
+              <Link href="/inbox" onClick={(e) => handleLinkClick(e, "/inbox")} className="flex items-center gap-3 rounded-lg px-3 py-2 text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10">
                 <Mail className="h-4 w-4" /> Hộp thư
               </Link>
               {profile?.role === "admin" && (
                 <>
                   <div className="mt-4 px-3 text-xs font-semibold uppercase tracking-wider text-primary-foreground/60">Quản trị</div>
-                  <Link href="/admin" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2 text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10">
+                  <Link href="/admin" onClick={(e) => handleLinkClick(e, "/admin")} className="flex items-center gap-3 rounded-lg px-3 py-2 text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10">
                     <ShieldAlert className="h-4 w-4" /> Nhân sự
                   </Link>
                 </>

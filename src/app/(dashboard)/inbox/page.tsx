@@ -564,7 +564,10 @@ export default function InboxPage() {
     <div className="flex flex-col gap-6 w-full h-[calc(100vh-100px)]">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b pb-4 shrink-0">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2 text-primary">
+          <h1 
+            className="text-3xl font-bold tracking-tight flex items-center gap-2 text-primary cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => window.location.href = '/inbox'}
+          >
             <Mail className="h-8 w-8 text-primary" /> Hộp Thư
           </h1>
           <p className="text-muted-foreground mt-1">Gửi và nhận tin nhắn, tài liệu với các thành viên khác.</p>
@@ -576,7 +579,7 @@ export default function InboxPage() {
           setAttachments([])
           setReplyThreadId(null)
           setIsComposeOpen(true)
-        }} className="gap-2">
+        }} className="gap-2 w-full sm:w-auto justify-center">
           <Send className="h-4 w-4" /> Soạn thư
         </Button>
       </div>

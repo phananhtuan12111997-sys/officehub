@@ -577,12 +577,17 @@ export default function DocumentsPage() {
     <div className="flex flex-col gap-6 max-w-6xl mx-auto pb-10">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-primary">Kho tài liệu</h1>
+          <h1 
+            className="text-2xl font-bold tracking-tight text-primary cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => window.location.href = '/documents'}
+          >
+            Kho tài liệu
+          </h1>
           <p className="text-muted-foreground">Lưu trữ, quản lý và chia sẻ văn bản nội bộ.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto mt-2 sm:mt-0">
           {isAdmin && (
-            <Button variant="outline" onClick={() => setIsFolderDialogOpen(true)}>
+            <Button variant="outline" onClick={() => setIsFolderDialogOpen(true)} className="w-full sm:w-auto">
               <Plus className="w-4 h-4 mr-2" />
               Tạo thư mục
             </Button>

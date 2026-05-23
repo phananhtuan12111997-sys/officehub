@@ -438,13 +438,18 @@ export default function FeedPage() {
 
   return (
     <div className="flex flex-col gap-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-8 border-b pb-4">
-        <h1 className="text-3xl font-bold tracking-tight text-primary">Bảng tin nội bộ</h1>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8 border-b pb-4">
+        <h1 
+          className="text-2xl sm:text-3xl font-bold tracking-tight text-primary cursor-pointer hover:opacity-80 transition-opacity"
+          onClick={() => window.location.href = '/'}
+        >
+          Bảng tin nội bộ
+        </h1>
         {isAdmin && (
           <>
             <Button 
               onClick={() => setShowForm(true)} 
-              className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm rounded-full px-6"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm rounded-full px-6 w-full sm:w-auto"
             >
               Bạn muốn thông báo điều gì?
             </Button>

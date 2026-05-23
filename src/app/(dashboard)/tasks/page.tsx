@@ -428,11 +428,16 @@ export default function TasksPage() {
     <div className="flex flex-col gap-4 max-w-7xl mx-auto h-[calc(100vh-6rem)] overflow-hidden">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shrink-0">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-primary">Công việc</h1>
+          <h1 
+            className="text-2xl font-bold tracking-tight text-primary cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => window.location.href = '/tasks'}
+          >
+            Công việc
+          </h1>
           <p className="text-muted-foreground">Theo dõi và giao việc cá nhân, phòng ban.</p>
         </div>
         {isAdmin && (
-          <Button onClick={() => setShowForm(true)} className="flex items-center gap-2">
+          <Button onClick={() => setShowForm(true)} className="flex items-center gap-2 w-full sm:w-auto justify-center">
             <Plus className="w-4 h-4" />
             Giao việc mới
           </Button>

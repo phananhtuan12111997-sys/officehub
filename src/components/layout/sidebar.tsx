@@ -25,6 +25,13 @@ export function Sidebar() {
     })
   }, [])
 
+  const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    if (pathname === href || (href === '/inbox' && pathname.startsWith('/inbox'))) {
+      e.preventDefault()
+      window.location.href = href
+    }
+  }
+
   return (
     <aside className="fixed inset-y-0 left-0 z-10 hidden w-14 flex-col border-r border-primary-foreground/20 bg-primary text-primary-foreground sm:flex md:w-64">
       <div className="flex w-full items-center justify-center border-b border-primary-foreground/20 py-4 lg:py-6">
@@ -39,6 +46,7 @@ export function Sidebar() {
         <nav className="grid items-start px-2 text-sm font-medium gap-1">
           <Link
             href="/"
+            onClick={(e) => handleLinkClick(e, "/")}
             className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all ${pathname === "/" ? "bg-primary-foreground/20 text-white font-semibold" : "text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10"}`}
           >
             <Home className="h-4 w-4" />
@@ -46,6 +54,7 @@ export function Sidebar() {
           </Link>
           <Link
             href="/documents"
+            onClick={(e) => handleLinkClick(e, "/documents")}
             className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all ${pathname === "/documents" ? "bg-primary-foreground/20 text-white font-semibold" : "text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10"}`}
           >
             <FileText className="h-4 w-4" />
@@ -53,6 +62,7 @@ export function Sidebar() {
           </Link>
           <Link
             href="/tasks"
+            onClick={(e) => handleLinkClick(e, "/tasks")}
             className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all ${pathname === "/tasks" ? "bg-primary-foreground/20 text-white font-semibold" : "text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10"}`}
           >
             <CheckSquare className="h-4 w-4" />
@@ -60,6 +70,7 @@ export function Sidebar() {
           </Link>
           <Link
             href="/inbox"
+            onClick={(e) => handleLinkClick(e, "/inbox")}
             className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all ${pathname.startsWith("/inbox") ? "bg-primary-foreground/20 text-white font-semibold" : "text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10"}`}
           >
             <Mail className="h-4 w-4" />
@@ -73,6 +84,7 @@ export function Sidebar() {
               </div>
               <Link
                 href="/admin"
+                onClick={(e) => handleLinkClick(e, "/admin")}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all ${pathname === "/admin" ? "bg-primary-foreground/20 text-white font-semibold" : "text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10"}`}
               >
                 <ShieldAlert className="h-4 w-4" />
