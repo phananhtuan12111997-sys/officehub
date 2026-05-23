@@ -554,7 +554,8 @@ export default function InboxPage() {
               } else if (isVideo) {
                 return <video src={previewAttachment.url} controls className="max-w-full max-h-full shadow-md" />
               } else if (isOffice) {
-                const officeViewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(previewAttachment.url)}`;
+                // Using Google Docs Viewer as it is generally faster and more reliable than Microsoft's viewer
+                const officeViewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(previewAttachment.url)}&embedded=true`;
                 return <iframe src={officeViewerUrl} className="w-full h-full border-0 bg-white shadow-md rounded-md" />
               }
               
