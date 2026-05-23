@@ -68,7 +68,14 @@ export default function LoginPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Mật khẩu</Label>
-                <a href="#" className="text-xs text-primary hover:underline">Quên mật khẩu?</a>
+                <a 
+                  href="#" 
+                  className="text-xs text-primary hover:underline"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    alert("Vui lòng liên hệ admin");
+                  }}
+                >Quên mật khẩu?</a>
               </div>
               <Input 
                 id="password" 
