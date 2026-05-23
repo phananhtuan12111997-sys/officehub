@@ -292,7 +292,7 @@ export default function InboxPage() {
         </Button>
       </div>
 
-      <div className="flex flex-col md:flex-row flex-1 gap-6 min-h-0">
+      <div className="flex h-[calc(100dvh-65px)] overflow-hidden p-2 sm:p-6 gap-2 sm:gap-6">
         {/* Cột trái: Danh sách thư */}
         <div className={`flex flex-col w-full md:w-1/3 border rounded-lg bg-card shadow-sm overflow-hidden ${readingMessage ? 'hidden md:flex' : 'flex'}`}>
           <Tabs defaultValue="inbox" className="w-full flex flex-col h-full" onValueChange={(v) => { setViewMode(v as any); setReadingMessage(null); setSelectedMails(new Set()); }}>
@@ -379,10 +379,10 @@ export default function InboxPage() {
                     return (
                     <div 
                       key={msg.id} 
-                      className={`relative p-4 pl-10 pr-10 flex items-start gap-3 cursor-pointer hover:bg-muted/50 transition-colors ${readingMessage?.id === msg.id ? 'bg-primary/10 border-l-4 border-l-primary' : 'border-l-4 border-l-transparent'} ${isPinned ? 'bg-amber-50 dark:bg-amber-950/30' : ''}`}
+                      className={`relative p-3 pl-8 pr-8 sm:p-4 sm:pl-10 sm:pr-10 flex items-start gap-3 cursor-pointer hover:bg-muted/50 transition-colors ${readingMessage?.id === msg.id ? 'bg-primary/10 border-l-4 border-l-primary' : 'border-l-4 border-l-transparent'} ${isPinned ? 'bg-amber-50 dark:bg-amber-950/30' : ''}`}
                       onClick={() => openMessage(msg, "sent")}
                     >
-                      <div className="absolute left-3 top-5" onClick={e => e.stopPropagation()}>
+                      <div className="absolute left-2 sm:left-3 top-4 sm:top-5" onClick={e => e.stopPropagation()}>
                         <input 
                           type="checkbox" 
                           className="w-4 h-4 rounded border-gray-300 text-primary cursor-pointer"
@@ -390,7 +390,7 @@ export default function InboxPage() {
                           onChange={(e) => toggleSelect(msg.id, e)}
                         />
                       </div>
-                      <div className="absolute right-3 top-5" onClick={e => togglePin(msg.id, e)}>
+                      <div className="absolute right-2 sm:right-3 top-4 sm:top-5" onClick={e => togglePin(msg.id, e)}>
                         <Pin className={`w-4 h-4 ${isPinned ? 'fill-amber-500 text-amber-500' : 'text-muted-foreground hover:text-foreground'} cursor-pointer transition-colors`} />
                       </div>
                       <Avatar className="h-10 w-10 shrink-0">
@@ -426,7 +426,7 @@ export default function InboxPage() {
             </div>
           ) : (
             <div className="flex flex-col h-full relative">
-              <div className="p-6 border-b shrink-0 flex justify-between items-start">
+              <div className="p-4 sm:p-6 border-b shrink-0 flex justify-between items-start">
                 <div className="flex flex-col gap-4 w-full">
                   <div className="flex items-center justify-between w-full">
                     <h2 className="text-2xl font-bold break-words pr-8">{readingMessage.subject}</h2>
@@ -472,7 +472,7 @@ export default function InboxPage() {
                 </div>
               </div>
               
-              <div className="p-6 flex-1 overflow-y-auto">
+              <div className="p-4 sm:p-6 flex-1 overflow-y-auto">
                 <div className="ql-snow">
                   <div className="ql-editor p-0 text-sm" dangerouslySetInnerHTML={{ __html: readingMessage.body }}>
                   </div>
@@ -530,7 +530,7 @@ export default function InboxPage() {
 
       {/* Xem trước tệp đính kèm */}
       <Dialog open={!!previewAttachment} onOpenChange={(open) => !open && setPreviewAttachment(null)}>
-        <DialogContent className="sm:max-w-4xl h-[80vh] flex flex-col p-0 overflow-hidden">
+        <DialogContent className="sm:max-w-4xl max-sm:max-w-[100vw] max-sm:w-[100vw] h-[100dvh] sm:h-[80vh] max-sm:rounded-none max-sm:border-0 flex flex-col p-0 overflow-hidden">
           <DialogHeader className="p-4 border-b shrink-0 flex flex-row items-center justify-between">
             <DialogTitle className="truncate pr-4">{previewAttachment?.name || 'Xem trước tệp'}</DialogTitle>
           </DialogHeader>
@@ -573,7 +573,7 @@ export default function InboxPage() {
 
       {/* Soạn thư Modal */}
       <Dialog open={isComposeOpen} onOpenChange={setIsComposeOpen}>
-        <DialogContent className="sm:max-w-[700px] h-[90vh] sm:h-[80vh] flex flex-col p-0 overflow-hidden gap-0">
+        <DialogContent className="sm:max-w-[700px] max-sm:max-w-[100vw] max-sm:w-[100vw] h-[100dvh] sm:h-[80vh] max-sm:rounded-none max-sm:border-0 flex flex-col p-0 overflow-hidden gap-0">
           <DialogHeader className="p-6 pb-4 border-b shrink-0">
             <DialogTitle>Soạn thư mới</DialogTitle>
           </DialogHeader>
