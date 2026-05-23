@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
-import { Loader2, Mail, Send, Eye, Paperclip, Reply, FileText, Trash2, Forward, User, X, Pin, MoreHorizontal, Download } from "lucide-react"
+import { Loader2, Mail, Send, Eye, Paperclip, Reply, FileText, Trash2, Forward, User, X, Pin, MoreHorizontal, Download, Search } from "lucide-react"
 import { FileUpload, Attachment } from "@/components/ui/file-upload"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -48,6 +48,7 @@ export default function InboxPage() {
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [searchUser, setSearchUser] = useState("")
   const [showUserDropdown, setShowUserDropdown] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
 
   // Xem trước file
   const [previewAttachment, setPreviewAttachment] = useState<any>(null)
@@ -209,6 +210,44 @@ export default function InboxPage() {
     return 0
   })
 
+  const getAvatarColor = (name: string) => {
+    if (!name) return 'bg-primary/20 text-primary';
+    const colors = ['bg-red-500 text-white', 'bg-orange-500 text-white', 'bg-amber-500 text-white', 'bg-green-500 text-white', 'bg-emerald-500 text-white', 'bg-teal-500 text-white', 'bg-cyan-500 text-white', 'bg-blue-500 text-white', 'bg-indigo-500 text-white', 'bg-violet-500 text-white', 'bg-purple-500 text-white', 'bg-pink-500 text-white', 'bg-rose-500 text-white'];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  }
+
+  const handleToggleRead = async (msg: MailboxMessage, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const newStatus = !msg.is_read
+    const { error } = await supabase.from("mailbox").update({ is_read: newStatus }).eq("id", msg.id)
+    if (!error) {
+      setInbox(inbox.map(m => m.id === msg.id ? { ...m, is_read: newStatus } : m))
+      if (readingMessage?.id === msg.id) {
+        setReadingMessage({ ...readingMessage, is_read: newStatus })
+      }
+    }
+  }
+
+  const filteredInbox = sortedInbox.filter(msg => {
+    const s = searchQuery.toLowerCase();
+    if (!s) return true;
+    return msg.subject.toLowerCase().includes(s) || 
+           getProfileName(msg.sender_id).toLowerCase().includes(s) ||
+           msg.body.replace(/<[^>]*>?/gm, '').toLowerCase().includes(s);
+  });
+
+  const filteredSent = sortedSent.filter(msg => {
+    const s = searchQuery.toLowerCase();
+    if (!s) return true;
+    return msg.subject.toLowerCase().includes(s) || 
+           getProfileName(msg.receiver_id).toLowerCase().includes(s) ||
+           msg.body.replace(/<[^>]*>?/gm, '').toLowerCase().includes(s);
+  });
+
   const handleDeleteMail = async (msg: MailboxMessage) => {
     if (!confirm("Bạn có chắc chắn muốn xóa thư này?\n\nLƯU Ý: Do thiết kế hệ thống hiện tại, thư sẽ bị xóa VĨNH VIỄN khỏi hộp thư của cả người gửi và người nhận.")) return
     
@@ -301,6 +340,15 @@ export default function InboxPage() {
                 <TabsTrigger value="inbox" className="data-active:bg-primary data-active:text-primary-foreground">Hộp thư đến</TabsTrigger>
                 <TabsTrigger value="sent" className="data-active:bg-primary data-active:text-primary-foreground">Đã gửi</TabsTrigger>
               </TabsList>
+              <div className="relative mt-2">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Tìm kiếm thư..."
+                  className="pl-9 h-9 bg-background"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
             </div>
             
             {/* Thanh công cụ thao tác hàng loạt */}
@@ -322,20 +370,24 @@ export default function InboxPage() {
             </div>
 
             <TabsContent value="inbox" className="flex-1 overflow-y-auto m-0 p-0 relative">
-              {sortedInbox.length === 0 ? (
-                <div className="p-8 text-center text-muted-foreground">Không có thư nào.</div>
+              {filteredInbox.length === 0 ? (
+                <div className="p-8 text-center text-muted-foreground">Không tìm thấy thư nào.</div>
               ) : (
                 <div className="divide-y">
-                  {sortedInbox.map((msg) => {
+                  {filteredInbox.map((msg) => {
                     const p = getProfile(msg.sender_id)
                     const isPinned = pinnedMails.has(msg.id)
+                    const avatarColor = getAvatarColor(p?.full_name || p?.email || '')
                     return (
                     <div 
                       key={msg.id} 
                       className={`relative p-4 pl-10 pr-10 flex items-start gap-3 cursor-pointer hover:bg-muted/50 transition-colors ${readingMessage?.id === msg.id ? 'bg-primary/10 border-l-4 border-l-primary' : 'border-l-4 border-l-transparent'} ${!msg.is_read ? 'bg-primary/5' : ''} ${isPinned ? 'bg-amber-50 dark:bg-amber-950/30' : ''}`}
                       onClick={() => openMessage(msg, "inbox")}
                     >
-                      <div className="absolute left-3 top-5" onClick={e => e.stopPropagation()}>
+                      {!msg.is_read && (
+                        <div className="absolute left-1 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                      )}
+                      <div className="absolute left-4 top-5" onClick={e => e.stopPropagation()}>
                         <input 
                           type="checkbox" 
                           className="w-4 h-4 rounded border-gray-300 text-primary cursor-pointer"
@@ -343,23 +395,23 @@ export default function InboxPage() {
                           onChange={(e) => toggleSelect(msg.id, e)}
                         />
                       </div>
-                      <div className="absolute right-3 top-5" onClick={e => togglePin(msg.id, e)}>
+                      <div className="absolute right-3 top-5 flex items-center gap-2" onClick={e => togglePin(msg.id, e)}>
                         <Pin className={`w-4 h-4 ${isPinned ? 'fill-amber-500 text-amber-500' : 'text-muted-foreground hover:text-foreground'} cursor-pointer transition-colors`} />
                       </div>
-                      <Avatar className="h-10 w-10 shrink-0">
+                      <Avatar className="h-10 w-10 shrink-0 ml-1">
                         <AvatarImage src={p?.avatar_url} />
-                        <AvatarFallback className="bg-primary/20 text-primary">{p?.full_name?.charAt(0) || <User className="w-4 h-4" />}</AvatarFallback>
+                        <AvatarFallback className={avatarColor}>{p?.full_name?.charAt(0) || <User className="w-4 h-4" />}</AvatarFallback>
                       </Avatar>
                       <div className="flex flex-col gap-1 overflow-hidden flex-1">
                         <div className="flex items-center justify-between gap-2">
-                          <span className={`truncate text-sm ${!msg.is_read ? 'font-bold text-primary' : 'font-semibold'}`}>{getProfileName(msg.sender_id)}</span>
-                          <span className="text-[10px] text-muted-foreground whitespace-nowrap">{new Date(msg.created_at).toLocaleDateString('vi-VN')}</span>
+                          <span className={`truncate text-sm ${!msg.is_read ? 'font-bold text-foreground' : 'font-semibold'}`}>{getProfileName(msg.sender_id)}</span>
+                          <span className={`text-[10px] whitespace-nowrap ${!msg.is_read ? 'font-bold text-primary' : 'text-muted-foreground'}`}>{new Date(msg.created_at).toLocaleDateString('vi-VN')}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className={`text-xs truncate ${!msg.is_read ? 'font-semibold text-foreground' : 'text-foreground'}`}>{msg.subject}</span>
+                          <span className={`text-xs truncate ${!msg.is_read ? 'font-bold text-foreground' : 'text-muted-foreground'}`}>{msg.subject}</span>
                           {msg.attachments?.length > 0 && <Paperclip className="h-3 w-3 text-muted-foreground shrink-0" />}
                         </div>
-                        <div className="text-xs truncate text-muted-foreground" dangerouslySetInnerHTML={{ __html: msg.body.replace(/<[^>]*>?/gm, '') }}>
+                        <div className={`text-xs truncate ${!msg.is_read ? 'text-foreground/80' : 'text-muted-foreground'}`} dangerouslySetInnerHTML={{ __html: msg.body.replace(/<[^>]*>?/gm, '') }}>
                         </div>
                       </div>
                     </div>
@@ -369,13 +421,14 @@ export default function InboxPage() {
             </TabsContent>
 
             <TabsContent value="sent" className="flex-1 overflow-y-auto m-0 p-0 relative">
-              {sortedSent.length === 0 ? (
+              {filteredSent.length === 0 ? (
                 <div className="p-8 text-center text-muted-foreground">Bạn chưa gửi thư nào.</div>
               ) : (
                 <div className="divide-y">
-                  {sortedSent.map((msg) => {
+                  {filteredSent.map((msg) => {
                     const p = getProfile(msg.receiver_id)
                     const isPinned = pinnedMails.has(msg.id)
+                    const avatarColor = getAvatarColor(p?.full_name || p?.email || '')
                     return (
                     <div 
                       key={msg.id} 
@@ -395,7 +448,7 @@ export default function InboxPage() {
                       </div>
                       <Avatar className="h-10 w-10 shrink-0">
                         <AvatarImage src={p?.avatar_url} />
-                        <AvatarFallback className="bg-muted text-muted-foreground">{p?.full_name?.charAt(0) || <User className="w-4 h-4" />}</AvatarFallback>
+                        <AvatarFallback className={avatarColor}>{p?.full_name?.charAt(0) || <User className="w-4 h-4" />}</AvatarFallback>
                       </Avatar>
                       <div className="flex flex-col gap-1 overflow-hidden flex-1">
                         <div className="flex items-center justify-between gap-2">
@@ -438,8 +491,8 @@ export default function InboxPage() {
                     <div className="flex items-center gap-3">
                       <Avatar className="h-10 w-10">
                         <AvatarImage src={viewMode === "inbox" ? getProfile(readingMessage.sender_id)?.avatar_url : getProfile(readingMessage.receiver_id)?.avatar_url} />
-                        <AvatarFallback className="bg-primary/10 text-primary font-bold">
-                          {viewMode === "inbox" ? getProfile(readingMessage.sender_id)?.full_name?.charAt(0) : getProfile(readingMessage.receiver_id)?.full_name?.charAt(0)}
+                        <AvatarFallback className={getAvatarColor(viewMode === "inbox" ? getProfileName(readingMessage.sender_id) : getProfileName(readingMessage.receiver_id))}>
+                          {viewMode === "inbox" ? getProfileName(readingMessage.sender_id)?.charAt(0) : getProfileName(readingMessage.receiver_id)?.charAt(0)}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex flex-col text-sm">
@@ -456,9 +509,14 @@ export default function InboxPage() {
                       
                       <div className="ml-2 flex items-center gap-1 bg-muted/50 rounded-md p-1 border">
                         {viewMode === "inbox" && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-background" onClick={() => handleReply(readingMessage)} title="Trả lời">
-                            <Reply className="h-4 w-4" />
-                          </Button>
+                          <>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-background" onClick={(e) => { handleToggleRead(readingMessage, e); setReadingMessage(null); }} title="Đánh dấu chưa đọc">
+                              <Mail className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-background" onClick={() => handleReply(readingMessage)} title="Trả lời">
+                              <Reply className="h-4 w-4" />
+                            </Button>
+                          </>
                         )}
                         <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-background" onClick={() => handleForward(readingMessage)} title="Chuyển tiếp">
                           <Forward className="h-4 w-4" />
