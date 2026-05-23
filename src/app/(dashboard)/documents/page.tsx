@@ -568,7 +568,7 @@ export default function DocumentsPage() {
     <div className="flex flex-col gap-6 max-w-6xl mx-auto pb-10">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-blue-600 dark:text-blue-400">Kho tài liệu</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-primary">Kho tài liệu</h1>
           <p className="text-muted-foreground">Lưu trữ, quản lý và chia sẻ văn bản nội bộ.</p>
         </div>
         <div className="flex gap-2">
