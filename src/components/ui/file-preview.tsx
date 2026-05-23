@@ -34,11 +34,15 @@ export function FilePreview({ open, onOpenChange, file }: FilePreviewProps) {
   }, [open, onOpenChange])
 
   const handleClose = () => {
-    if (window.history.state?.preview) {
-      window.history.back()
-    } else {
-      onOpenChange(false)
-    }
+    onOpenChange(false)
+    
+    // Use setTimeout to ensure the dialog and iframe unmount before calling history.back()
+    // This prevents the iframe (like Google Docs) from hijacking the back navigation
+    setTimeout(() => {
+      if (window.history.state?.preview) {
+        window.history.back()
+      }
+    }, 50)
   }
 
   if (!file) return null;
