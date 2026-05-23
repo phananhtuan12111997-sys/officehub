@@ -197,60 +197,62 @@ export default function DocumentsPage() {
 
   const fetchData = async () => {
     setLoading(true)
-    
-    // Fetch Folders (only if not searching and at root)
-    if (!searchQuery && !currentFolder) {
-      try {
-        // Fetch folders via API
-        const { data: { session } } = await supabase.auth.getSession()
-        
-        if (session) {
-          const foldersRes = await fetch('/api/documents/folders', {
-            headers: {
-              Authorization: `Bearer ${session.access_token}`
-            }
-          })
-          if (foldersRes.ok) {
-            const foldersData = await foldersRes.json()
-            setFolders(foldersData || [])
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching folders:", error)
-        setFolders([])
-      }
-    }
-
-    // Fetch Documents
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
-        let url = '/api/documents?'
-        if (searchQuery) {
-          url += `search=${encodeURIComponent(searchQuery)}`
-          setIsSearching(true)
-        } else {
-          setIsSearching(false)
-          if (currentFolder) {
-            url += `folder_id=${currentFolder.id}`
-          }
-        }
-        
-        const res = await fetch(url, {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`
-          }
-        })
-        if (res.ok) {
-          const data = await res.json()
-          setFiles(data || [])
+      if (!session) {
+        setLoading(false)
+        return
+      }
+
+      const promises = []
+
+      // Fetch Folders
+      if (!searchQuery && !currentFolder) {
+        promises.push(
+          fetch('/api/documents/folders', {
+            headers: { Authorization: `Bearer ${session.access_token}` }
+          })
+          .then(res => res.json())
+          .then(data => setFolders(data || []))
+          .catch(error => {
+            console.error("Error fetching folders:", error)
+            setFolders([])
+          })
+        )
+      } else {
+        setFolders([])
+      }
+
+      // Fetch Documents
+      let url = '/api/documents?'
+      if (searchQuery) {
+        url += `search=${encodeURIComponent(searchQuery)}`
+        setIsSearching(true)
+      } else {
+        setIsSearching(false)
+        if (currentFolder) {
+          url += `folder_id=${currentFolder.id}`
         }
       }
+      promises.push(
+        fetch(url, {
+          headers: { Authorization: `Bearer ${session.access_token}` }
+        })
+        .then(res => res.json())
+        .then(data => setFiles(data || []))
+        .catch(error => {
+          console.error("Error fetching documents:", error)
+          setFiles([])
+        })
+      )
+
+      await Promise.all(promises)
+
     } catch (error) {
-      console.error("Error fetching documents:", error)
-      setFiles([])
+      console.error("Error in fetchData:", error)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   const handleCreateFolder = async (e: React.FormEvent) => {
