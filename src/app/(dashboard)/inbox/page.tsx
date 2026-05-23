@@ -530,46 +530,87 @@ export default function InboxPage() {
 
       {/* Xem trước tệp đính kèm */}
       <Dialog open={!!previewAttachment} onOpenChange={(open) => !open && setPreviewAttachment(null)}>
-        <DialogContent className="sm:max-w-4xl max-sm:max-w-[100vw] max-sm:w-[100vw] h-[100dvh] sm:h-[80vh] max-sm:rounded-none max-sm:border-0 flex flex-col p-0 overflow-hidden">
-          <DialogHeader className="p-4 border-b shrink-0 flex flex-row items-center justify-between">
-            <DialogTitle className="truncate pr-4">{previewAttachment?.name || 'Xem trước tệp'}</DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 overflow-hidden bg-black/5 flex items-center justify-center p-4">
-            {(() => {
-              if (!previewAttachment) return null;
-              
-              const mime = (previewAttachment.type || '').toLowerCase();
-              const str = (previewAttachment.name || previewAttachment.url || '').toLowerCase();
-              
-              const isImage = mime.startsWith('image/') || str.match(/\.(jpeg|jpg|gif|png|webp)(\?.*)?$/);
-              const isPdf = mime === 'application/pdf' || str.match(/\.(pdf)(\?.*)?$/);
-              const isVideo = mime.startsWith('video/') || str.match(/\.(mp4|webm|ogg)(\?.*)?$/);
-              const isOffice = mime.includes('word') || mime.includes('excel') || mime.includes('powerpoint') || mime.includes('officedocument') || str.match(/\.(doc|docx|xls|xlsx|ppt|pptx)(\?.*)?$/);
-              const isText = mime.startsWith('text/') || str.match(/\.(txt|csv|json)(\?.*)?$/);
-
-              if (isImage) {
-                return <img src={previewAttachment.url} alt={previewAttachment.name || 'Image'} className="max-w-full max-h-full object-contain shadow-md" />
-              } else if (isPdf || isText) {
-                return <iframe src={previewAttachment.url} className="w-full h-full border-0 bg-white shadow-md rounded-md" />
-              } else if (isVideo) {
-                return <video src={previewAttachment.url} controls className="max-w-full max-h-full shadow-md" />
-              } else if (isOffice) {
-                // Using Google Docs Viewer as it is generally faster and more reliable than Microsoft's viewer
-                const officeViewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(previewAttachment.url)}&embedded=true`;
-                return <iframe src={officeViewerUrl} className="w-full h-full border-0 bg-white shadow-md rounded-md" />
-              }
-              
-              return <div className="text-muted-foreground flex flex-col items-center gap-2">
-                <FileText className="w-12 h-12 text-muted-foreground/50" />
-                <span>Không thể xem trước tệp này.</span>
+        {previewAttachment && (
+          <DialogContent className="sm:max-w-4xl w-[95vw] p-0 overflow-hidden flex flex-col gap-0 border-primary/20 shadow-xl h-[90vh] sm:h-auto max-h-[95vh] max-sm:max-w-[100vw] max-sm:w-[100vw] max-sm:h-[100dvh] max-sm:rounded-none max-sm:border-0">
+            <DialogHeader className="p-4 border-b bg-muted/30 flex flex-row items-center justify-between space-y-0">
+              <div className="flex items-center gap-3 overflow-hidden pr-8">
+                <div className="p-1.5 bg-primary/10 rounded text-primary shrink-0">
+                  <FileText className="h-5 w-5" />
+                </div>
+                <DialogTitle className="truncate font-semibold text-base">{previewAttachment.name || 'Xem trước tệp'}</DialogTitle>
               </div>
-            })()}
-          </div>
-          <DialogFooter className="p-4 border-t shrink-0">
-            <Button variant="outline" onClick={() => setPreviewAttachment(null)}>Đóng</Button>
-            <Button onClick={() => window.open(previewAttachment?.url, '_blank')} className="bg-blue-600 hover:bg-blue-700 text-white">Mở tab mới / Tải xuống</Button>
-          </DialogFooter>
-        </DialogContent>
+              <div className="flex items-center gap-2">
+                <a 
+                  href={previewAttachment.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  download
+                >
+                  <Button size="sm" variant="outline" className="gap-2 hidden sm:flex">
+                    <Download className="h-4 w-4" /> Tải xuống
+                  </Button>
+                  <Button size="icon" variant="outline" className="sm:hidden h-8 w-8">
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </a>
+              </div>
+            </DialogHeader>
+            <div className="flex-1 overflow-auto p-4 bg-background relative">
+              {(() => {
+                const mime = (previewAttachment.type || '').toLowerCase();
+                const str = (previewAttachment.name || previewAttachment.url || '').toLowerCase();
+                const ext = str.split('.').pop() || '';
+                
+                const isImage = mime.startsWith('image/') || ['jpeg', 'jpg', 'gif', 'png', 'webp'].includes(ext);
+                const isPdf = mime === 'application/pdf' || ext === 'pdf';
+                const isVideo = mime.startsWith('video/') || ['mp4', 'webm', 'ogg'].includes(ext);
+                const isOffice = mime.includes('word') || mime.includes('excel') || mime.includes('powerpoint') || mime.includes('officedocument') || ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext);
+                const isText = mime.startsWith('text/') || ['txt', 'csv', 'json'].includes(ext);
+
+                if (isImage) {
+                  return (
+                    <div className="flex items-center justify-center bg-black/5 rounded-md p-4 min-h-[50vh]">
+                      <img src={previewAttachment.url} alt={previewAttachment.name || 'Image'} className="max-w-full max-h-[70vh] object-contain shadow-sm rounded-md" />
+                    </div>
+                  )
+                } else if (isPdf || isText) {
+                  return (
+                    <div className="w-full h-[75vh] rounded-md overflow-hidden border">
+                      <iframe src={previewAttachment.url} className="w-full h-full border-0 bg-white" />
+                    </div>
+                  )
+                } else if (isVideo) {
+                  return (
+                    <div className="flex items-center justify-center bg-black/5 rounded-md p-4 min-h-[50vh]">
+                      <video src={previewAttachment.url} controls className="max-w-full max-h-[70vh] shadow-sm rounded-md" />
+                    </div>
+                  )
+                } else if (isOffice) {
+                  // Sử dụng view.aspx thay vì embed.aspx để có nút in giống tab Bảng tin
+                  const officeViewerUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(previewAttachment.url)}`;
+                  return (
+                    <div className="w-full h-[75vh] rounded-md overflow-hidden border">
+                      <iframe src={officeViewerUrl} className="w-full h-full border-0 bg-white" title={previewAttachment.name} />
+                    </div>
+                  )
+                }
+                
+                return (
+                  <div className="flex flex-col items-center justify-center py-20 text-center gap-4 bg-muted/20 rounded-md border border-dashed">
+                    <FileText className="h-16 w-16 text-muted-foreground/50" />
+                    <div>
+                      <p className="font-medium text-lg">Không thể xem trước định dạng file này</p>
+                      <p className="text-muted-foreground text-sm mt-1">Vui lòng tải xuống để xem nội dung.</p>
+                    </div>
+                    <a href={previewAttachment.url} download target="_blank" rel="noopener noreferrer">
+                      <Button>Tải xuống ngay</Button>
+                    </a>
+                  </div>
+                )
+              })()}
+            </div>
+          </DialogContent>
+        )}
       </Dialog>
 
       {/* Soạn thư Modal */}
