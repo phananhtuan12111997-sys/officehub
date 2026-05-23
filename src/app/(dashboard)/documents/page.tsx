@@ -18,6 +18,7 @@ import { supabase } from "@/lib/supabase/client"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { FilePreview } from "@/components/ui/file-preview"
 
 type DocumentType = {
   id: string
@@ -70,28 +71,6 @@ export default function DocumentsPage() {
   const [editingFile, setEditingFile] = useState<DocumentType | null>(null)
   const [editName, setEditName] = useState("")
   const [isSavingEdit, setIsSavingEdit] = useState(false)
-
-  const openPreview = (file: DocumentType) => {
-    window.history.pushState({ preview: true }, '');
-    setPreviewFile(file);
-  };
-
-  const closePreview = () => {
-    setPreviewFile(null);
-    if (window.history.state?.preview) {
-      window.history.back();
-    }
-  };
-
-  useEffect(() => {
-    const handlePopState = () => {
-      if (previewFile) {
-        setPreviewFile(null);
-      }
-    };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [previewFile]);
 
   const [editingFolder, setEditingFolder] = useState<FolderType | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
@@ -795,7 +774,7 @@ export default function DocumentsPage() {
                   .filter(f => filterDept === "all" || currentFolder ? true : (f.department || "Chung") === filterDept)
                   .map((file) => (
                   <TableRow key={file.id} className="hover:bg-muted/30">
-                    <TableCell className="font-medium flex items-center gap-3 cursor-pointer" onClick={() => openPreview(file)}>
+                    <TableCell className="font-medium flex items-center gap-3 cursor-pointer" onClick={() => setPreviewFile(file)}>
                       <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg">
                         {getFileIcon(file.name)}
                       </div>
@@ -835,7 +814,7 @@ export default function DocumentsPage() {
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          onClick={() => openPreview(file)}
+                          onClick={() => setPreviewFile(file)}
                           className="text-muted-foreground hover:text-primary"
                           title="Xem trước"
                         >
@@ -906,7 +885,7 @@ export default function DocumentsPage() {
                   {sortedFiles
                     .filter(f => filterDept === "all" || currentFolder ? true : (f.department || "Chung") === filterDept)
                     .map(file => (
-                    <div key={file.id} onClick={() => openPreview(file)} className="border rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 hover:border-primary/50 transition-colors group relative bg-card shadow-sm">
+                    <div key={file.id} onClick={() => setPreviewFile(file)} className="border rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 hover:border-primary/50 transition-colors group relative bg-card shadow-sm">
                       <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 backdrop-blur-sm rounded-md p-1 shadow-sm">
                          <Button variant="ghost" size="icon" className="h-6 w-6 text-blue-500" onClick={(e) => handleDownload(e, file.file_url, file.name)} title="Tải xuống">
                            <Download className="w-3 h-3" />
@@ -980,97 +959,11 @@ export default function DocumentsPage() {
       </Dialog>
 
       {/* File Preview Dialog */}
-      <Dialog open={!!previewFile} onOpenChange={(open) => !open && closePreview()}>
-        {previewFile && (
-          <DialogContent className="sm:max-w-4xl w-[95vw] p-0 overflow-hidden flex flex-col gap-0 border-primary/20 shadow-xl h-[90vh] sm:h-auto max-h-[95vh]">
-            <DialogHeader className="p-2 sm:p-4 border-b bg-muted/30 flex flex-row items-center justify-between space-y-0 relative">
-              <div className="flex items-center gap-2 overflow-hidden flex-1">
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="sm:hidden h-8 w-8 shrink-0 rounded-full" 
-                  onClick={closePreview}
-                >
-                  <ChevronLeft className="h-5 w-5" />
-                </Button>
-                <div className="p-1.5 bg-primary/10 rounded text-primary hidden sm:block">
-                  {getFileIcon(previewFile.name)}
-                </div>
-                <DialogTitle className="truncate font-semibold text-sm sm:text-base pr-2">{previewFile.name}</DialogTitle>
-              </div>
-              <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  className="gap-2 hidden sm:flex"
-                  onClick={(e) => handleDownload(e, previewFile.file_url, previewFile.name)}
-                >
-                  <Download className="h-4 w-4" /> Tải xuống
-                </Button>
-                <Button 
-                  size="icon" 
-                  variant="outline" 
-                  className="sm:hidden h-8 w-8 rounded-full"
-                  onClick={(e) => handleDownload(e, previewFile.file_url, previewFile.name)}
-                >
-                  <Download className="h-4 w-4" />
-                </Button>
-              </div>
-            </DialogHeader>
-            <div className="flex-1 overflow-auto p-4 bg-background relative">
-              {(() => {
-                const ext = previewFile.name.split('.').pop()?.toLowerCase() || "";
-                
-                // Hình ảnh
-                if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
-                  return (
-                    <div className="flex items-center justify-center bg-black/5 rounded-md p-4 min-h-[50vh]">
-                      <img src={previewFile.file_url} alt={previewFile.name} className="max-w-full max-h-[70vh] object-contain rounded-md shadow-sm" />
-                    </div>
-                  )
-                }
-                
-                // PDF
-                if (ext === 'pdf') {
-                  return (
-                    <div className="w-full h-[75vh] rounded-md overflow-hidden border">
-                      <iframe src={previewFile.file_url} className="w-full h-full" title={previewFile.name} />
-                    </div>
-                  )
-                }
-                
-                // Office files (Word, Excel, PowerPoint)
-                if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) {
-                  const googleViewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(previewFile.file_url)}&embedded=true`
-                  return (
-                    <div className="w-full h-[75vh] rounded-md overflow-hidden border">
-                      <iframe 
-                        src={googleViewerUrl} 
-                        className="w-full h-full" 
-                        title={previewFile.name} 
-                      />
-                    </div>
-                  )
-                }
-
-                // Các loại file khác không hỗ trợ xem trước
-                return (
-                  <div className="flex flex-col items-center justify-center py-20 text-center gap-4 bg-muted/20 rounded-md border border-dashed">
-                    <FileIcon className="h-16 w-16 text-muted-foreground/50" />
-                    <div>
-                      <p className="font-medium text-lg">Không thể xem trước định dạng file này</p>
-                      <p className="text-muted-foreground text-sm mt-1">Vui lòng tải xuống để xem nội dung.</p>
-                    </div>
-                    <a href={previewFile.file_url} download target="_blank" rel="noopener noreferrer">
-                      <Button>Tải xuống ngay</Button>
-                    </a>
-                  </div>
-                )
-              })()}
-            </div>
-          </DialogContent>
-        )}
-      </Dialog>
+      <FilePreview 
+        open={!!previewFile} 
+        onOpenChange={(open) => !open && setPreviewFile(null)} 
+        file={previewFile ? { name: previewFile.name, url: previewFile.file_url } : null} 
+      />
 
       {/* Edit File Dialog */}
       <Dialog open={!!editingFile} onOpenChange={(open) => !open && setEditingFile(null)}>

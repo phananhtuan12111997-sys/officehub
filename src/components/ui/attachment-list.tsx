@@ -4,6 +4,7 @@ import { useState } from "react"
 import { FileIcon, Download, FileText, Image as ImageIcon, FileSpreadsheet, FileIcon as FilePdf } from "lucide-react"
 import { Attachment } from "./file-upload"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { FilePreview } from "@/components/ui/file-preview"
 import { Button } from "@/components/ui/button"
 
 interface AttachmentListProps {
@@ -42,52 +43,6 @@ export function AttachmentList({ attachments }: AttachmentListProps) {
     setPreviewFile(file)
   }
 
-  const renderPreviewContent = (file: Attachment) => {
-    const ext = getFileExtension(file.name)
-    
-    // Hình ảnh
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
-      return (
-        <div className="flex items-center justify-center bg-black/5 rounded-md p-4 min-h-[50vh]">
-          <img src={file.url} alt={file.name} className="max-w-full max-h-[70vh] object-contain rounded-md shadow-sm" />
-        </div>
-      )
-    }
-    
-    // PDF
-    if (ext === 'pdf') {
-      return (
-        <div className="w-full h-[75vh] rounded-md overflow-hidden border">
-          <iframe src={file.url} className="w-full h-full" title={file.name} />
-        </div>
-      )
-    }
-    
-    // Office files (Word, Excel, PowerPoint)
-    if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) {
-      const officeViewerUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(file.url)}`
-      return (
-        <div className="w-full h-[75vh] rounded-md overflow-hidden border">
-          <iframe src={officeViewerUrl} className="w-full h-full" title={file.name} />
-        </div>
-      )
-    }
-
-    // Các loại file khác không hỗ trợ xem trước
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center gap-4 bg-muted/20 rounded-md border border-dashed">
-        <FileIcon className="h-16 w-16 text-muted-foreground/50" />
-        <div>
-          <p className="font-medium text-lg">Không thể xem trước định dạng file này</p>
-          <p className="text-muted-foreground text-sm mt-1">Vui lòng tải xuống để xem nội dung.</p>
-        </div>
-        <a href={file.url} download target="_blank" rel="noopener noreferrer">
-          <Button>Tải xuống ngay</Button>
-        </a>
-      </div>
-    )
-  }
-
   return (
     <div className="mt-4 border-t pt-4">
       <h4 className="text-sm font-semibold mb-3">Tài liệu đính kèm ({attachments.length})</h4>
@@ -122,38 +77,11 @@ export function AttachmentList({ attachments }: AttachmentListProps) {
         ))}
       </div>
 
-      <Dialog open={!!previewFile} onOpenChange={(open) => !open && setPreviewFile(null)}>
-        {previewFile && (
-          <DialogContent className="sm:max-w-4xl w-[95vw] p-0 overflow-hidden flex flex-col gap-0 border-primary/20 shadow-xl h-[90vh] sm:h-auto max-h-[95vh]">
-            <DialogHeader className="p-4 border-b bg-muted/30 flex flex-row items-center justify-between space-y-0">
-              <div className="flex items-center gap-3 overflow-hidden pr-8">
-                <div className="p-1.5 bg-primary/10 rounded text-primary">
-                  {getFileIcon(previewFile.name)}
-                </div>
-                <DialogTitle className="truncate font-semibold text-base">{previewFile.name}</DialogTitle>
-              </div>
-              <div className="flex items-center gap-2">
-                <a 
-                  href={previewFile.url} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  download
-                >
-                  <Button size="sm" variant="outline" className="gap-2 hidden sm:flex">
-                    <Download className="h-4 w-4" /> Tải xuống
-                  </Button>
-                  <Button size="icon" variant="outline" className="sm:hidden h-8 w-8">
-                    <Download className="h-4 w-4" />
-                  </Button>
-                </a>
-              </div>
-            </DialogHeader>
-            <div className="flex-1 overflow-auto p-4 bg-background relative">
-              {renderPreviewContent(previewFile)}
-            </div>
-          </DialogContent>
-        )}
-      </Dialog>
+      <FilePreview 
+        open={!!previewFile} 
+        onOpenChange={(open) => !open && setPreviewFile(null)} 
+        file={previewFile ? { name: previewFile.name, url: previewFile.url } : null} 
+      />
     </div>
   )
 }
