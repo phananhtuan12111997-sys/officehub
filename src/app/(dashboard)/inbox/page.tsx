@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
-import { Loader2, Mail, Send, Eye, Paperclip, Reply, FileText, Trash2, Forward, User, X, Pin, MoreHorizontal, Download, Search } from "lucide-react"
+import { Loader2, Mail, Send, Eye, Paperclip, Reply, FileText, Trash2, Forward, User, X, Pin, MoreHorizontal, Download, Search, Minimize2, Maximize2 } from "lucide-react"
 import { FileUpload, Attachment } from "@/components/ui/file-upload"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -49,6 +49,37 @@ export default function InboxPage() {
   const [searchUser, setSearchUser] = useState("")
   const [showUserDropdown, setShowUserDropdown] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
+
+  // New features: Pagination & Compose Minimize
+  const [visibleInboxCount, setVisibleInboxCount] = useState(20)
+  const [visibleSentCount, setVisibleSentCount] = useState(20)
+  const [isComposeMinimized, setIsComposeMinimized] = useState(false)
+
+  // Draft feature effect
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const draft = localStorage.getItem('email_draft')
+      if (draft) {
+        try {
+          const parsed = JSON.parse(draft)
+          if (parsed.receiverIds) setReceiverIds(parsed.receiverIds)
+          if (parsed.subject) setSubject(parsed.subject)
+          if (parsed.body) setBody(parsed.body)
+          if (parsed.attachments) setAttachments(parsed.attachments)
+        } catch (e) {}
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (receiverIds.length > 0 || subject || body || attachments.length > 0) {
+        localStorage.setItem('email_draft', JSON.stringify({ receiverIds, subject, body, attachments }))
+      } else {
+        localStorage.removeItem('email_draft')
+      }
+    }
+  }, [receiverIds, subject, body, attachments])
 
   // Xem trước file
   const [previewAttachment, setPreviewAttachment] = useState<any>(null)
@@ -134,6 +165,8 @@ export default function InboxPage() {
       setBody("")
       setQuotedBody("")
       setAttachments([])
+      if (typeof window !== 'undefined') localStorage.removeItem('email_draft')
+      alert("Đã gửi thư thành công!")
       setSearchUser("")
       if (data) {
         setSent([...data, ...sent])
@@ -373,8 +406,9 @@ export default function InboxPage() {
               {filteredInbox.length === 0 ? (
                 <div className="p-8 text-center text-muted-foreground">Không tìm thấy thư nào.</div>
               ) : (
-                <div className="divide-y">
-                  {filteredInbox.map((msg) => {
+                <div className="flex flex-col">
+                  <div className="divide-y">
+                    {filteredInbox.slice(0, visibleInboxCount).map((msg) => {
                     const p = getProfile(msg.sender_id)
                     const isPinned = pinnedMails.has(msg.id)
                     const avatarColor = getAvatarColor(p?.full_name || p?.email || '')
@@ -416,6 +450,12 @@ export default function InboxPage() {
                       </div>
                     </div>
                   )})}
+                  </div>
+                  {visibleInboxCount < filteredInbox.length && (
+                    <div className="p-4 text-center border-t">
+                      <Button variant="outline" size="sm" onClick={() => setVisibleInboxCount(prev => prev + 20)}>Tải thêm thư cũ</Button>
+                    </div>
+                  )}
                 </div>
               )}
             </TabsContent>
@@ -424,8 +464,9 @@ export default function InboxPage() {
               {filteredSent.length === 0 ? (
                 <div className="p-8 text-center text-muted-foreground">Bạn chưa gửi thư nào.</div>
               ) : (
-                <div className="divide-y">
-                  {filteredSent.map((msg) => {
+                <div className="flex flex-col">
+                  <div className="divide-y">
+                    {filteredSent.slice(0, visibleSentCount).map((msg) => {
                     const p = getProfile(msg.receiver_id)
                     const isPinned = pinnedMails.has(msg.id)
                     const avatarColor = getAvatarColor(p?.full_name || p?.email || '')
@@ -464,6 +505,12 @@ export default function InboxPage() {
                       </div>
                     </div>
                   )})}
+                  </div>
+                  {visibleSentCount < filteredSent.length && (
+                    <div className="p-4 text-center border-t">
+                      <Button variant="outline" size="sm" onClick={() => setVisibleSentCount(prev => prev + 20)}>Tải thêm thư cũ</Button>
+                    </div>
+                  )}
                 </div>
               )}
             </TabsContent>
@@ -671,13 +718,30 @@ export default function InboxPage() {
         )}
       </Dialog>
 
-      {/* Soạn thư Modal */}
-      <Dialog open={isComposeOpen} onOpenChange={setIsComposeOpen}>
-        <DialogContent className="sm:max-w-[700px] max-sm:max-w-[100vw] max-sm:w-[100vw] h-[100dvh] sm:h-[80vh] max-sm:rounded-none max-sm:border-0 flex flex-col p-0 overflow-hidden gap-0">
-          <DialogHeader className="p-6 pb-4 border-b shrink-0">
-            <DialogTitle>Soạn thư mới</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSendMail} className="flex flex-col flex-1 overflow-hidden">
+      {/* Soạn thư Floating Modal */}
+      {isComposeOpen && (
+        <div className={`fixed z-50 bg-background border shadow-2xl flex flex-col transition-all duration-300 overflow-hidden ${
+          isComposeMinimized 
+            ? 'bottom-0 right-4 sm:right-10 w-80 h-[48px] rounded-t-lg' 
+            : 'bottom-0 right-0 sm:right-10 w-full h-[100dvh] sm:w-[600px] sm:h-[600px] sm:rounded-t-lg'
+        }`}>
+          <div className="flex items-center justify-between p-3 border-b bg-muted cursor-pointer shrink-0" onClick={() => setIsComposeMinimized(!isComposeMinimized)}>
+            <div className="flex items-center gap-2">
+              <Mail className="h-4 w-4 text-primary" />
+              <h3 className="font-semibold text-sm">Soạn thư mới</h3>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button type="button" variant="ghost" size="icon" className="h-7 w-7 hover:bg-muted-foreground/20" onClick={(e) => { e.stopPropagation(); setIsComposeMinimized(!isComposeMinimized); }}>
+                {isComposeMinimized ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
+              </Button>
+              <Button type="button" variant="ghost" size="icon" className="h-7 w-7 hover:bg-muted-foreground/20 hover:text-red-500" onClick={(e) => { e.stopPropagation(); setIsComposeOpen(false); }}>
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
+          
+          {!isComposeMinimized && (
+            <form onSubmit={handleSendMail} className="flex flex-col flex-1 overflow-hidden bg-background">
             <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
               
               {/* Multi-select Người nhận */}
@@ -781,16 +845,17 @@ export default function InboxPage() {
               </div>
             </div>
 
-            <DialogFooter className="p-6 pt-4 border-t shrink-0">
-              <Button type="button" variant="outline" onClick={() => setIsComposeOpen(false)}>Hủy</Button>
+            <div className="p-4 border-t shrink-0 flex items-center justify-between bg-muted/10">
+              <Button type="button" variant="outline" onClick={() => setIsComposeOpen(false)}>Hủy & Lưu nháp</Button>
               <Button type="submit" disabled={isSending || receiverIds.length === 0 || !subject.trim() || !body.trim() || body.trim() === "<p><br></p>"}>
                 {isSending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 <Send className="mr-2 h-4 w-4" /> Gửi thư {receiverIds.length > 0 ? `(${receiverIds.length} người)` : ""}
               </Button>
-            </DialogFooter>
+            </div>
           </form>
-        </DialogContent>
-      </Dialog>
+          )}
+        </div>
+      )}
     </div>
   )
 }
