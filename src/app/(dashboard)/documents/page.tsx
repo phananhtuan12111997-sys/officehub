@@ -1041,10 +1041,15 @@ export default function DocumentsPage() {
                 
                 // Office files (Word, Excel, PowerPoint)
                 if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) {
-                  const officeViewerUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(previewFile.file_url)}`
+                  const officeViewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(previewFile.file_url)}`
                   return (
                     <div className="w-full h-[75vh] rounded-md overflow-hidden border">
-                      <iframe src={officeViewerUrl} className="w-full h-full" title={previewFile.name} />
+                      <iframe 
+                        src={officeViewerUrl} 
+                        className="w-full h-full" 
+                        title={previewFile.name} 
+                        sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+                      />
                     </div>
                   )
                 }
