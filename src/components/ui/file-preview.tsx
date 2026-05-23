@@ -3,7 +3,7 @@
 import { useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { FileIcon, Download, FileText, Image as ImageIcon, FileSpreadsheet, FileIcon as FilePdf, Printer, ChevronLeft } from "lucide-react"
+import { FileIcon, Download, FileText, Image as ImageIcon, FileSpreadsheet, FileIcon as FilePdf, Printer, ChevronLeft, X } from "lucide-react"
 
 export interface PreviewFile {
   name: string;
@@ -119,6 +119,7 @@ export function FilePreview({ open, onOpenChange, file }: FilePreviewProps) {
     }}>
       <DialogContent 
         className="sm:max-w-4xl w-[95vw] p-0 overflow-hidden flex flex-col gap-0 border-primary/20 shadow-xl h-[95vh] sm:h-[85vh] max-h-[95vh]"
+        showCloseButton={false}
       >
         <DialogHeader className="p-2 sm:p-4 border-b bg-muted/30 flex flex-row items-center justify-between space-y-0 relative z-10">
           <div className="flex items-center gap-2 sm:gap-3 overflow-hidden flex-1 mr-2">
@@ -149,6 +150,17 @@ export function FilePreview({ open, onOpenChange, file }: FilePreviewProps) {
             </Button>
             <Button size="icon" variant="default" className="gap-2 h-8 w-8 rounded-full sm:hidden" onClick={handleDownload} title="Tải xuống">
               <Download className="h-4 w-4" />
+            </Button>
+            
+            {/* Close button for desktop and explicit X for clarity */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="hidden sm:flex h-8 w-8 shrink-0 rounded-full ml-1 text-muted-foreground hover:text-foreground"
+              onClick={handleClose}
+              title="Đóng"
+            >
+              <X className="h-5 w-5" />
             </Button>
           </div>
         </DialogHeader>

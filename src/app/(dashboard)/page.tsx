@@ -21,7 +21,7 @@ import { EmojiReactions } from "@/components/ui/emoji-reactions"
 import { PollCreator, PollData } from "@/components/ui/poll-creator"
 import { PollViewer } from "@/components/ui/poll-viewer"
 import Link from "next/link"
-
+import { useRouter } from "next/navigation"
 type PostType = {
   id: string
   title: string
@@ -38,6 +38,7 @@ type PostType = {
 }
 
 export default function FeedPage() {
+  const router = useRouter()
   const [posts, setPosts] = useState<PostType[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -603,13 +604,13 @@ export default function FeedPage() {
             const images = post.attachments?.filter(a => a.type.startsWith('image/')) || []
 
             return (
-            <Card key={post.id} className="flex flex-col h-full overflow-hidden hover:shadow-md transition-shadow border-primary/10">
+            <Card key={post.id} className="flex flex-col h-full overflow-hidden hover:shadow-md transition-shadow border-primary/10 cursor-pointer" onClick={() => router.push(`/post/${post.id}`)}>
               <CardHeader className="bg-muted/10 pb-4 border-b border-primary/5">
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex gap-2 items-center">
                     {isAdmin ? (
                       <button 
-                        onClick={() => handleTogglePin(post.id, post.is_pinned || false)}
+                        onClick={(e) => { e.stopPropagation(); handleTogglePin(post.id, post.is_pinned || false); }}
                         className={`hover:scale-110 transition-transform ${post.is_pinned ? 'text-red-500' : 'text-muted-foreground/40 hover:text-red-500'}`}
                         title={post.is_pinned ? 'Bỏ ghim' : 'Ghim bài này'}
                       >
@@ -631,10 +632,10 @@ export default function FeedPage() {
                     </span>
                     {isAdmin && (
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={() => handleEditPost(post)} title="Sửa thông báo">
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={(e) => { e.stopPropagation(); handleEditPost(post); }} title="Sửa thông báo">
                           <Edit2 className="h-3 w-3" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => handleDeletePost(post.id)} title="Xoá thông báo">
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleDeletePost(post.id); }} title="Xoá thông báo">
                           <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
@@ -642,7 +643,7 @@ export default function FeedPage() {
                   </div>
                 </div>
                 <CardTitle className={`text-xl leading-tight line-clamp-2 hover:text-primary transition-colors ${!hasRead ? 'font-black text-foreground' : 'font-bold text-foreground/80'}`}>
-                  <Link href={`/post/${post.id}`}>{post.title}</Link>
+                  <Link href={`/post/${post.id}`} onClick={(e) => e.stopPropagation()}>{post.title}</Link>
                 </CardTitle>
                 <CardDescription className="flex items-center gap-2 mt-2 text-xs">
                   <span>Bởi <strong>{post.author_name}</strong></span>
@@ -655,29 +656,37 @@ export default function FeedPage() {
                 />
                 
                 {post.polls && post.polls.length > 0 && (
-                  <PollViewer 
-                    poll={post.polls[0]} 
-                    currentUserId={currentUser?.id} 
-                    onVoteComplete={() => fetchPosts(false, filterDept)} 
-                  />
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <PollViewer 
+                      poll={post.polls[0]} 
+                      currentUserId={currentUser?.id} 
+                      onVoteComplete={() => fetchPosts(false, filterDept)} 
+                    />
+                  </div>
                 )}
                 
-                {images.length > 0 && <ImageGallery images={images} />}
+                {images.length > 0 && (
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <ImageGallery images={images} />
+                  </div>
+                )}
               </CardContent>
               <CardFooter className="bg-muted/5 border-t pt-4 flex items-center justify-between">
                 <div className="flex items-center text-xs text-muted-foreground gap-4">
-                  <EmojiReactions 
-                    postId={post.id}
-                    reactions={post.post_reads || []}
-                    currentUserId={currentUser?.id}
-                    onReact={handleReaction}
-                  />
-                  <Link href={`/post/${post.id}`} className="flex items-center gap-1 hover:text-primary transition-colors" title="Bình luận">
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <EmojiReactions 
+                      postId={post.id}
+                      reactions={post.post_reads || []}
+                      currentUserId={currentUser?.id}
+                      onReact={handleReaction}
+                    />
+                  </div>
+                  <Link href={`/post/${post.id}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-1 hover:text-primary transition-colors" title="Bình luận">
                     <MessageCircle className="h-4 w-4" />
                     <span>{post.comments?.length || 0}</span>
                   </Link>
                   {post.attachments && post.attachments.filter(a => !a.type.startsWith('image/')).length > 0 && (
-                    <div className="flex items-center gap-1 text-primary">
+                    <div className="flex items-center gap-1 text-primary" onClick={(e) => e.stopPropagation()}>
                       <Paperclip className="h-3.5 w-3.5" />
                       <span>{post.attachments.filter(a => !a.type.startsWith('image/')).length}</span>
                     </div>
