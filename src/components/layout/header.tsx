@@ -347,7 +347,14 @@ export function Header() {
       {/* User Menu */}
       <div className="flex items-center gap-2 sm:gap-4 sm:ml-auto md:ml-auto">
         {/* Notification Bell */}
-        <DropdownMenu>
+        <DropdownMenu onOpenChange={(open) => {
+          if (open) {
+            setTimeout(() => {
+              const container = document.getElementById('notification-scroll-container');
+              if (container) container.scrollTop = 0;
+            }, 0);
+          }
+        }}>
           <DropdownMenuTrigger className="relative inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-primary-foreground/10 hover:text-white h-9 w-9 text-primary-foreground">
             <Bell className="h-5 w-5" />
             {unreadCount > 0 && (
@@ -370,7 +377,7 @@ export function Header() {
                 </Button>
               )}
             </div>
-            <div className="max-h-[350px] overflow-y-auto py-1">
+            <div id="notification-scroll-container" className="max-h-[350px] overflow-y-auto py-1">
               {notifications.length === 0 ? (
                 <div className="p-8 text-center text-sm text-muted-foreground flex flex-col items-center gap-2">
                   <Bell className="h-8 w-8 text-muted-foreground/30" />

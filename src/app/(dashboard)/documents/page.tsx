@@ -161,10 +161,17 @@ export default function DocumentsPage() {
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
-      fetchData()
+      if (searchQuery) fetchData()
     }, 500)
     return () => clearTimeout(delayDebounceFn)
-  }, [searchQuery, currentFolder, filterDept])
+  }, [searchQuery])
+
+  useEffect(() => {
+    if (!searchQuery) {
+      setLoading(true)
+      fetchData()
+    }
+  }, [currentFolder, filterDept, searchQuery])
 
   const fetchDepartments = async () => {
     const { data } = await supabase.from("departments").select("id, name").order("name")
@@ -611,10 +618,10 @@ export default function DocumentsPage() {
           setSearchQuery("")
         }} className="w-full md:w-auto overflow-auto">
           <TabsList className="flex flex-wrap h-auto w-full justify-start bg-transparent">
-            <TabsTrigger value="all" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-4">Tất cả</TabsTrigger>
-            <TabsTrigger value="Chung" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-4">Chung</TabsTrigger>
+            <TabsTrigger value="all" className="data-active:bg-primary data-active:text-primary-foreground rounded-full px-4">Tất cả</TabsTrigger>
+            <TabsTrigger value="Chung" className="data-active:bg-primary data-active:text-primary-foreground rounded-full px-4">Chung</TabsTrigger>
             {departments.map(d => (
-              <TabsTrigger key={d.id} value={d.name} className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-4 whitespace-nowrap">Phòng {d.name}</TabsTrigger>
+              <TabsTrigger key={d.id} value={d.name} className="data-active:bg-primary data-active:text-primary-foreground rounded-full px-4 whitespace-nowrap">Phòng {d.name}</TabsTrigger>
             ))}
           </TabsList>
         </Tabs>

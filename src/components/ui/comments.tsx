@@ -96,7 +96,7 @@ export function Comments({ postId, taskId }: { postId?: string, taskId?: string 
           const { data: task } = await supabase.from('tasks').select('assignee_id, creator_id').eq('id', taskId).single()
           // For tasks, notify creator or assignee depending on who is commenting
           targetUserId = task?.creator_id === user.id ? task?.assignee_id : task?.creator_id
-          notifLink = `/tasks`
+          notifLink = `/tasks?taskId=${taskId}`
         }
 
         if (targetUserId && targetUserId !== user.id) {
@@ -106,9 +106,10 @@ export function Comments({ postId, taskId }: { postId?: string, taskId?: string 
           // Get total comments for this post
           const { count: totalComments } = await supabase.from('comments').select('id', { count: 'exact' }).eq(postId ? 'post_id' : 'task_id', postId || taskId)
           
-          let message = `${actorName} đã bình luận: "${newComment.trim().substring(0, 50)}${newComment.length > 50 ? '...' : ''}"`
+          const contextName = postId ? 'bài viết' : 'công việc'
+          let message = `${actorName} đã bình luận ở ${contextName}: "${newComment.trim().substring(0, 50)}${newComment.length > 50 ? '...' : ''}"`
           if (totalComments && totalComments > 1) {
-             message = `${actorName} và ${totalComments - 1} người khác đã bình luận về bài viết của bạn.`
+             message = `${actorName} và ${totalComments - 1} người khác đã bình luận ở ${contextName} của bạn.`
           }
 
           const { data: existingNotif } = await supabase
@@ -148,9 +149,10 @@ export function Comments({ postId, taskId }: { postId?: string, taskId?: string 
           // Count replies to this specific comment
           const { count: totalReplies } = await supabase.from('comments').select('id', { count: 'exact' }).eq('parent_id', replyTo.id)
           
-          let replyMessage = `${actorName} đã trả lời bình luận của bạn.`
+          const contextName = postId ? 'bài viết' : 'công việc'
+          let replyMessage = `${actorName} đã trả lời bình luận của bạn ở ${contextName}.`
           if (totalReplies && totalReplies > 1) {
-             replyMessage = `${actorName} và ${totalReplies - 1} người khác đã trả lời bình luận của bạn.`
+             replyMessage = `${actorName} và ${totalReplies - 1} người khác đã trả lời bình luận của bạn ở ${contextName}.`
           }
 
           const { data: existingReplyNotif } = await supabase
