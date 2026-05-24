@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
@@ -40,6 +40,14 @@ type ThreadMessage = MailboxMessage & {
 }
 
 export default function InboxPage() {
+  return (
+    <Suspense fallback={<div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}>
+      <InboxContent />
+    </Suspense>
+  )
+}
+
+function InboxContent() {
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [inbox, setInbox] = useState<MailboxMessage[]>([])
