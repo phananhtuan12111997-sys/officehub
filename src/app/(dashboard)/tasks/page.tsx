@@ -861,10 +861,10 @@ export default function TasksPage() {
                 </Badge>
                 <Badge variant="secondary">{COLUMNS.find(c => c.id === selectedTask?.status)?.title}</Badge>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 pr-8 sm:pr-10">
                 {!isEditingTask && selectedTask && (
                   <>
-                    {(!selectedTask.creator_id || selectedTask.creator_id === currentUserId) && (
+                    {(!selectedTask.creator_id || selectedTask.creator_id === currentUserId || isAdmin) && (
                       <>
                         <Button variant="ghost" size="icon" onClick={() => {
                           setEditTaskData({

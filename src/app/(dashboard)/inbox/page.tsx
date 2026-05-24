@@ -974,7 +974,7 @@ export default function InboxPage() {
                 </div>
                 <DialogTitle className="truncate font-semibold text-base">{previewAttachment.name || 'Xem trước tệp'}</DialogTitle>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 pr-8">
                 <a 
                   href={previewAttachment.url} 
                   target="_blank" 
