@@ -37,9 +37,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Admin only" }, { status: 403 })
     }
 
-    const { name, department } = await req.json()
-    console.log("Inserting folder:", name, "for department:", department)
-    const { data, error } = await supabaseAdmin.from("document_folders").insert({ name, department: department || 'Chung' }).select()
+    const { name, department, parent_id } = await req.json()
+    console.log("Inserting folder:", name, "for department:", department, "parent:", parent_id)
+    const { data, error } = await supabaseAdmin.from("document_folders").insert({ 
+      name, 
+      department: department || 'Chung',
+      parent_id: parent_id || null
+    }).select()
 
     if (error) {
       console.log("Insert error:", error)

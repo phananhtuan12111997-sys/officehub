@@ -36,6 +36,7 @@ type FolderType = {
   name: string
   department?: string
   is_pinned?: boolean
+  parent_id?: string | null
   created_at: string
 }
 
@@ -268,7 +269,11 @@ export default function DocumentsPage() {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${session.access_token}`
       },
-      body: JSON.stringify({ name: newFolderName.trim(), department: newFolderDepartment })
+      body: JSON.stringify({ 
+        name: newFolderName.trim(), 
+        department: newFolderDepartment,
+        parent_id: currentFolder?.id || null 
+      })
     })
 
     if (!res.ok) {
@@ -617,12 +622,12 @@ export default function DocumentsPage() {
           setFilterDept(val)
           setCurrentFolder(null)
           setSearchQuery("")
-        }} className="w-full md:w-auto overflow-auto">
-          <TabsList className="flex flex-wrap h-auto w-full justify-start bg-transparent">
-            <TabsTrigger value="all" className="data-active:bg-primary data-active:text-primary-foreground rounded-full px-4">Tất cả</TabsTrigger>
-            <TabsTrigger value="Chung" className="data-active:bg-primary data-active:text-primary-foreground rounded-full px-4">Chung</TabsTrigger>
+        }} className="w-full md:w-auto overflow-hidden">
+          <TabsList className="flex h-auto w-full justify-start bg-transparent overflow-x-auto [&::-webkit-scrollbar]:hidden pb-1">
+            <TabsTrigger value="all" className="data-active:bg-primary data-active:text-primary-foreground rounded-full px-4 whitespace-nowrap shrink-0">Tất cả</TabsTrigger>
+            <TabsTrigger value="Chung" className="data-active:bg-primary data-active:text-primary-foreground rounded-full px-4 whitespace-nowrap shrink-0">Chung</TabsTrigger>
             {departments.map(d => (
-              <TabsTrigger key={d.id} value={d.name} className="data-active:bg-primary data-active:text-primary-foreground rounded-full px-4 whitespace-nowrap">Phòng {d.name}</TabsTrigger>
+              <TabsTrigger key={d.id} value={d.name} className="data-active:bg-primary data-active:text-primary-foreground rounded-full px-4 whitespace-nowrap shrink-0">Phòng {d.name}</TabsTrigger>
             ))}
           </TabsList>
         </Tabs>
@@ -653,7 +658,15 @@ export default function DocumentsPage() {
         <div className="flex flex-col sm:flex-row items-center justify-between bg-card p-4 rounded-xl border shadow-sm gap-4 mb-4">
           <div className="flex items-center gap-2 flex-1">
             {currentFolder ? (
-              <Button variant="ghost" size="sm" onClick={() => { setCurrentFolder(null); setSearchQuery(""); }} className="px-2">
+              <Button variant="ghost" size="sm" onClick={() => { 
+                if (currentFolder.parent_id) {
+                  const parentFolder = folders.find(f => f.id === currentFolder.parent_id)
+                  setCurrentFolder(parentFolder || null)
+                } else {
+                  setCurrentFolder(null)
+                }
+                setSearchQuery(""); 
+              }} className="px-2">
                 <ChevronLeft className="w-4 h-4 mr-1" />
                 Quay lại
               </Button>
@@ -719,8 +732,9 @@ export default function DocumentsPage() {
               </TableRow>
             ) : (
               <>
-                {/* Render Folders (only if not searching and no current folder) */}
-                {!isSearching && !currentFolder && sortedFolders
+                {/* Render Folders (only if not searching) */}
+                {!isSearching && sortedFolders
+                  .filter(f => currentFolder ? f.parent_id === currentFolder.id : !f.parent_id)
                   .filter(f => filterDept === "all" ? true : (f.department || "Chung") === filterDept)
                   .map((folder) => (
                   <TableRow 
@@ -841,14 +855,15 @@ export default function DocumentsPage() {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
              {loading ? (
                 <div className="col-span-full flex justify-center p-10"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
-             ) : (!currentFolder && !isSearching && folders.length === 0) || ((currentFolder || isSearching) && files.length === 0) ? (
+             ) : (!isSearching && sortedFolders.filter(f => currentFolder ? f.parent_id === currentFolder.id : !f.parent_id).length === 0 && files.length === 0) ? (
                 <div className="col-span-full flex flex-col items-center justify-center p-10 text-muted-foreground">
                    <FolderIcon className="w-12 h-12 mb-4 opacity-20" />
                    <p>Chưa có tài liệu hoặc thư mục nào</p>
                 </div>
              ) : (
                 <>
-                  {!isSearching && !currentFolder && sortedFolders
+                  {!isSearching && sortedFolders
+                    .filter(f => currentFolder ? f.parent_id === currentFolder.id : !f.parent_id)
                     .filter(f => filterDept === "all" ? true : (f.department || "Chung") === filterDept)
                     .map(folder => (
                     <div key={folder.id} onClick={() => setCurrentFolder(folder)} className="border rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 hover:border-primary/50 transition-colors group relative bg-card shadow-sm">

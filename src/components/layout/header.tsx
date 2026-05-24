@@ -382,16 +382,20 @@ export function Header() {
           <DropdownMenuContent align="end" className="w-80 p-0">
             <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
               <span className="font-semibold text-sm">Thông báo</span>
-              {unreadCount > 0 && (
-                <Button variant="ghost" size="sm" className="h-auto p-0 text-xs text-primary font-medium" onClick={async (e) => {
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className={`h-auto p-0 text-xs font-medium ${unreadCount > 0 ? 'text-primary' : 'text-muted-foreground'}`} 
+                disabled={unreadCount === 0}
+                onClick={async (e) => {
                   e.stopPropagation()
-                  if (!profile) return
+                  if (!profile || unreadCount === 0) return
                   await supabase.from('notifications').update({ is_read: true }).eq('user_id', profile.id).eq('is_read', false)
                   fetchNotifications(profile.id)
-                }}>
-                  Đánh dấu đã đọc
-                </Button>
-              )}
+                }}
+              >
+                Đánh dấu đã đọc
+              </Button>
             </div>
             <div id="notification-scroll-container" className="max-h-[350px] overflow-y-auto py-1">
               {notifications.length === 0 ? (
