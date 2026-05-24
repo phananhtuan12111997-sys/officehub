@@ -76,7 +76,8 @@ export function FilePreview({ open, onOpenChange, file }: FilePreviewProps) {
     }
     
     if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) {
-      const officeViewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(file.url)}`
+      // Use Google Docs viewer instead of Microsoft Office viewer
+      const officeViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(file.url)}&embedded=true`
       return (
         <iframe src={officeViewerUrl} className="w-full h-full border-0" title={file.name} />
       )
@@ -106,59 +107,91 @@ export function FilePreview({ open, onOpenChange, file }: FilePreviewProps) {
   
   const handlePrint = (e: React.MouseEvent) => {
     e.preventDefault()
-    if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) {
-      window.open(`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(file.url)}`, '_blank')
+    
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
+      const printWindow = window.open('', '_blank')
+      if (printWindow) {
+        printWindow.document.write(`
+          <html>
+            <head><title>Print</title></head>
+            <body style="margin:0;display:flex;justify-content:center;align-items:center;">
+              <img src="${file.url}" style="max-width:100%; max-height:100vh;" onload="window.print();window.close();" />
+            </body>
+          </html>
+        `)
+        printWindow.document.close()
+      }
+    } else if (ext === 'pdf') {
+      const iframe = document.createElement('iframe')
+      iframe.style.display = 'none'
+      iframe.src = file.url
+      document.body.appendChild(iframe)
+      iframe.onload = () => {
+        iframe.contentWindow?.print()
+        setTimeout(() => {
+          if (document.body.contains(iframe)) document.body.removeChild(iframe)
+        }, 5000)
+      }
+    } else if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) {
+      // Due to CORS and iframe limitations, we cannot print Office files directly
+      // Open the Office viewer in a new tab so the user can use its native print feature
+      window.open(`https://docs.google.com/viewer?url=${encodeURIComponent(file.url)}`, '_blank')
     } else {
       window.open(file.url, '_blank')
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => {
-      if (!isOpen) handleClose()
-    }}>
-      <DialogContent 
-        className="sm:max-w-4xl w-[95vw] sm:w-[90vw] p-0 overflow-hidden flex flex-col gap-0 border-primary/20 shadow-xl h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] sm:h-[85vh] sm:max-h-[85vh]"
-        showCloseButton={false}
-      >
-        <DialogHeader className="p-2 sm:p-4 border-b bg-muted/30 flex flex-row items-center justify-between space-y-0 relative z-10 shrink-0">
-          <div className="flex items-center gap-2 sm:gap-3 overflow-hidden flex-1 mr-2">
-            <div className="p-1.5 bg-primary/10 rounded text-primary shrink-0">
-              {getFileIcon(file.name)}
+    <>
+      <Dialog open={open} onOpenChange={(isOpen) => {
+        if (!isOpen) handleClose()
+      }}>
+        <DialogContent 
+          className="sm:max-w-4xl w-[95vw] sm:w-[90vw] p-0 overflow-hidden flex flex-col gap-0 border-primary/20 shadow-xl h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] sm:h-[85vh] sm:max-h-[85vh]"
+          showCloseButton={false}
+        >
+          <DialogHeader className="p-2 sm:p-4 border-b bg-muted/30 flex flex-row items-center justify-between space-y-0 relative z-10 shrink-0">
+            <div className="flex items-center gap-2 sm:gap-3 overflow-hidden flex-1 mr-2">
+              <div className="p-1.5 bg-primary/10 rounded text-primary shrink-0">
+                {getFileIcon(file.name)}
+              </div>
+              <DialogTitle className="truncate font-semibold text-sm sm:text-base">{file.name}</DialogTitle>
             </div>
-            <DialogTitle className="truncate font-semibold text-sm sm:text-base">{file.name}</DialogTitle>
-          </div>
-          
-          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-            <Button size="icon" variant="outline" className="h-8 w-8 rounded-full sm:hidden" onClick={handlePrint} title="In tài liệu">
-              <Printer className="h-4 w-4" />
-            </Button>
-            <Button size="sm" variant="outline" className="gap-2 h-8 hidden sm:flex" onClick={handlePrint} title="In tài liệu">
-              <Printer className="h-4 w-4" /> <span>In</span>
-            </Button>
-
-            <Button size="icon" variant="default" className="h-8 w-8 rounded-full sm:hidden" onClick={handleDownload} title="Tải xuống">
-              <Download className="h-4 w-4" />
-            </Button>
-            <Button size="sm" variant="default" className="gap-2 h-8 hidden sm:flex" onClick={handleDownload} title="Tải xuống">
-              <Download className="h-4 w-4" /> <span>Tải xuống</span>
-            </Button>
             
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="flex h-8 w-8 shrink-0 rounded-full ml-1 text-muted-foreground hover:text-foreground bg-muted sm:bg-transparent"
-              onClick={handleClose}
-              title="Đóng"
-            >
-              <X className="h-5 w-5" />
-            </Button>
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+              <Button size="icon" variant="outline" className="h-8 w-8 rounded-full sm:hidden" onClick={handleDownload} title="Tải xuống">
+                <Download className="h-4 w-4" />
+              </Button>
+              {!['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext) && (
+                <>
+                  <Button size="icon" variant="outline" className="h-8 w-8 rounded-full sm:hidden" onClick={handlePrint} title="In tài liệu">
+                    <Printer className="h-4 w-4" />
+                  </Button>
+                  <Button size="sm" variant="outline" className="gap-2 h-8 hidden sm:flex" onClick={handlePrint} title="In tài liệu">
+                    <Printer className="h-4 w-4" /> <span>In</span>
+                  </Button>
+                </>
+              )}
+              <Button size="sm" variant="outline" className="gap-2 h-8 hidden sm:flex" onClick={handleDownload} title="Tải xuống">
+                <Download className="h-4 w-4" /> <span>Tải xuống</span>
+              </Button>
+              
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="flex h-8 w-8 shrink-0 rounded-full ml-1 text-muted-foreground hover:text-foreground bg-muted sm:bg-transparent"
+                onClick={handleClose}
+                title="Đóng"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+          </DialogHeader>
+          <div className={`flex-1 relative ${['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext) ? 'overflow-auto p-2 sm:p-4 bg-background' : 'overflow-hidden bg-white'}`}>
+            {renderContent()}
           </div>
-        </DialogHeader>
-        <div className={`flex-1 relative ${['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext) ? 'overflow-auto p-2 sm:p-4 bg-background' : 'overflow-hidden bg-white'}`}>
-          {renderContent()}
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

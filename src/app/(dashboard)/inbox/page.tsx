@@ -274,12 +274,11 @@ function InboxContent() {
     if (selectedMails.size === 0) return
 
     const currentList = viewMode === "inbox" ? sortedInbox : viewMode === "sent" ? sortedSent : sortedTrash;
-    const idsToDelete = currentList
-      .filter(msg => selectedMails.has(msg.id))
-      .flatMap(msg => msg.threadMessages.map(m => m.id));
+    const threadsToDelete = currentList.filter(msg => selectedMails.has(msg.id));
     
     if (viewMode === "trash") {
       if (!confirm(`Bạn có chắc muốn xóa VĨNH VIỄN ${selectedMails.size} luồng thư đã chọn?`)) return
+      const idsToDelete = threadsToDelete.flatMap(msg => msg.threadMessages.map(m => m.id));
       const { error } = await supabase.from("mailbox").delete().in("id", idsToDelete)
       
       if (error) {
@@ -295,19 +294,23 @@ function InboxContent() {
     } else {
       if (!confirm(`Chuyển ${selectedMails.size} luồng thư vào Thùng rác?`)) return
       
-      const updateData: any = {};
-      if (viewMode === "inbox") updateData.is_deleted_by_receiver = true;
-      if (viewMode === "sent") updateData.is_deleted_by_sender = true;
+      const allMsgs = threadsToDelete.flatMap(msg => msg.threadMessages);
+      const sentIds = allMsgs.filter(m => m.sender_id === currentUser?.id).map(m => m.id);
+      const receivedIds = allMsgs.filter(m => m.receiver_id === currentUser?.id).map(m => m.id);
       
-      const { error } = await supabase.from("mailbox").update(updateData).in("id", idsToDelete)
-      if (error) {
-        alert("Lỗi khi xóa thư: " + error.message)
-      } else {
-        if (viewMode === "inbox") {
-          setInbox(inbox.map(m => idsToDelete.includes(m.id) ? { ...m, is_deleted_by_receiver: true } : m))
-        } else {
-          setSent(sent.map(m => idsToDelete.includes(m.id) ? { ...m, is_deleted_by_sender: true } : m))
-        }
+      let hasError = false;
+      if (sentIds.length > 0) {
+        const { error } = await supabase.from("mailbox").update({ is_deleted_by_sender: true }).in("id", sentIds);
+        if (error) { alert("Lỗi khi xóa thư (sent): " + error.message); hasError = true; }
+      }
+      if (receivedIds.length > 0) {
+        const { error } = await supabase.from("mailbox").update({ is_deleted_by_receiver: true }).in("id", receivedIds);
+        if (error) { alert("Lỗi khi xóa thư (received): " + error.message); hasError = true; }
+      }
+      
+      if (!hasError) {
+        setInbox(inbox.map(m => receivedIds.includes(m.id) ? { ...m, is_deleted_by_receiver: true } : m));
+        setSent(sent.map(m => sentIds.includes(m.id) ? { ...m, is_deleted_by_sender: true } : m));
         setSelectedMails(new Set())
         if (readingMessage && selectedMails.has(readingMessage.id)) {
           handleCloseMessage()
@@ -439,34 +442,32 @@ function InboxContent() {
   const filteredInbox = sortedInbox.filter(msg => {
     const s = searchQuery.toLowerCase();
     if (!s) return true;
-    return msg.subject.toLowerCase().includes(s) || 
+    return (msg.subject || "").toLowerCase().includes(s) || 
            getProfileName(msg.sender_id).toLowerCase().includes(s) ||
-           msg.body.replace(/<[^>]*>?/gm, '').toLowerCase().includes(s);
+           (msg.body || "").replace(/<[^>]*>?/gm, '').toLowerCase().includes(s);
   });
 
   const filteredSent = sortedSent.filter(msg => {
     const s = searchQuery.toLowerCase();
     if (!s) return true;
-    return msg.subject.toLowerCase().includes(s) || 
+    return (msg.subject || "").toLowerCase().includes(s) || 
            getProfileName(msg.receiver_id).toLowerCase().includes(s) ||
-           msg.body.replace(/<[^>]*>?/gm, '').toLowerCase().includes(s);
+           (msg.body || "").replace(/<[^>]*>?/gm, '').toLowerCase().includes(s);
   });
 
   const filteredTrash = sortedTrash.filter(msg => {
     const s = searchQuery.toLowerCase();
     if (!s) return true;
-    return msg.subject.toLowerCase().includes(s) || 
+    return (msg.subject || "").toLowerCase().includes(s) || 
            getProfileName(msg.sender_id).toLowerCase().includes(s) ||
            getProfileName(msg.receiver_id).toLowerCase().includes(s) ||
-           msg.body.replace(/<[^>]*>?/gm, '').toLowerCase().includes(s);
+           (msg.body || "").replace(/<[^>]*>?/gm, '').toLowerCase().includes(s);
   });
 
   const handleDeleteMail = async (msg: ThreadMessage) => {
-    const threadIds = msg.threadMessages.map(m => m.id);
-
     if (viewMode === "trash") {
-      if (!confirm("Bạn có chắc chắn muốn xóa vĩnh viễn toàn bộ thư trong luồng này?\n\nLƯU Ý: Thư sẽ bị xóa VĨNH VIỄN khỏi cơ sở dữ liệu.")) return
-      
+      if (!confirm("Bạn có chắc chắn muốn xóa vĩnh viễn toàn bộ thư trong luồng này?\\n\\nLƯU Ý: Thư sẽ bị xóa VĨNH VIỄN khỏi cơ sở dữ liệu.")) return
+      const threadIds = msg.threadMessages.map(m => m.id);
       const { error } = await supabase.from("mailbox").delete().in("id", threadIds)
       if (error) {
         alert("Lỗi xóa thư: " + error.message)
@@ -478,19 +479,22 @@ function InboxContent() {
     } else {
       if (!confirm("Chuyển toàn bộ thư trong luồng này vào Thùng rác?")) return
       
-      const updateData: any = {};
-      if (viewMode === "inbox") updateData.is_deleted_by_receiver = true;
-      if (viewMode === "sent") updateData.is_deleted_by_sender = true;
+      const sentIds = msg.threadMessages.filter(m => m.sender_id === currentUser?.id).map(m => m.id);
+      const receivedIds = msg.threadMessages.filter(m => m.receiver_id === currentUser?.id).map(m => m.id);
 
-      const { error } = await supabase.from("mailbox").update(updateData).in("id", threadIds)
-      if (error) {
-        alert("Lỗi xóa thư: " + error.message)
-      } else {
-        if (viewMode === "inbox") {
-          setInbox(inbox.map(m => threadIds.includes(m.id) ? { ...m, is_deleted_by_receiver: true } : m))
-        } else {
-          setSent(sent.map(m => threadIds.includes(m.id) ? { ...m, is_deleted_by_sender: true } : m))
-        }
+      let hasError = false;
+      if (sentIds.length > 0) {
+        const { error } = await supabase.from("mailbox").update({ is_deleted_by_sender: true }).in("id", sentIds);
+        if (error) { alert("Lỗi khi xóa thư (sent): " + error.message); hasError = true; }
+      }
+      if (receivedIds.length > 0) {
+        const { error } = await supabase.from("mailbox").update({ is_deleted_by_receiver: true }).in("id", receivedIds);
+        if (error) { alert("Lỗi khi xóa thư (received): " + error.message); hasError = true; }
+      }
+      
+      if (!hasError) {
+        setInbox(inbox.map(m => receivedIds.includes(m.id) ? { ...m, is_deleted_by_receiver: true } : m));
+        setSent(sent.map(m => sentIds.includes(m.id) ? { ...m, is_deleted_by_sender: true } : m));
         handleCloseMessage()
       }
     }
@@ -1029,8 +1033,8 @@ function InboxContent() {
                     </div>
                   )
                 } else if (isOffice) {
-                  // Sử dụng view.aspx thay vì embed.aspx để có nút in giống tab Bảng tin
-                  const officeViewerUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(previewAttachment.url)}`;
+                  // Sử dụng Google Docs Viewer
+                  const officeViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(previewAttachment.url)}&embedded=true`;
                   return (
                     <div className="w-full h-[75vh] rounded-md overflow-hidden border">
                       <iframe src={officeViewerUrl} className="w-full h-full border-0 bg-white" title={previewAttachment.name} />

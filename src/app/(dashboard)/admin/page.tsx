@@ -28,6 +28,16 @@ type Profile = {
   created_at: string
 }
 
+const roleLabels: Record<string, string> = {
+  admin: "Quản trị viên",
+  ceo: "Tổng Giám Đốc",
+  director: "Giám Đốc",
+  deputy_director: "Phó Giám Đốc",
+  head_of_dept: "Trưởng Phòng",
+  deputy_head_of_dept: "Phó Trưởng Phòng",
+  staff: "Nhân viên"
+}
+
 export default function AdminPage() {
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
@@ -39,7 +49,7 @@ export default function AdminPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState("")
 
-  const [email, setEmail] = useState("")
+  const [account, setAccount] = useState("")
   const [password, setPassword] = useState("")
   const [fullName, setFullName] = useState("")
   const [role, setRole] = useState("staff")
@@ -124,20 +134,23 @@ export default function AdminPage() {
     if (!session) return
 
     try {
+      // Tự động thêm đuôi @officehub.local nếu admin chỉ nhập mỗi tên tài khoản
+      const loginEmail = account.includes("@") ? account : `${account}@officehub.local`
+
       const res = await fetch("/api/admin/users", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session.access_token}`
         },
-        body: JSON.stringify({ email, password, full_name: fullName, role, department_id: departmentId || null })
+        body: JSON.stringify({ email: loginEmail, password, full_name: fullName, role, department_id: departmentId || null })
       })
       
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Có lỗi xảy ra")
 
       setIsDialogOpen(false)
-      setEmail("")
+      setAccount("")
       setPassword("")
       setFullName("")
       setDepartmentId("")
@@ -326,7 +339,7 @@ export default function AdminPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Họ và tên</TableHead>
-                    <TableHead>Email</TableHead>
+                    <TableHead>Tài khoản</TableHead>
                     <TableHead>Vai trò</TableHead>
                     <TableHead>Phòng ban</TableHead>
                     <TableHead>Ngày tham gia</TableHead>
@@ -337,10 +350,10 @@ export default function AdminPage() {
                   {profiles.map((p) => (
                     <TableRow key={p.id}>
                       <TableCell className="font-medium">{p.full_name || "Chưa cập nhật"}</TableCell>
-                      <TableCell>{p.email}</TableCell>
+                      <TableCell>{p.email?.replace('@officehub.local', '')}</TableCell>
                       <TableCell>
-                        <Badge variant={p.role === "admin" ? "default" : "secondary"}>
-                          {p.role === "admin" ? "Admin" : "Nhân viên"}
+                        <Badge variant={p.role === "admin" ? "default" : (p.role === "staff" ? "secondary" : "outline")}>
+                          {roleLabels[p.role] || "Không xác định"}
                         </Badge>
                       </TableCell>
                       <TableCell>{getDeptName(p.department_id)}</TableCell>
@@ -416,8 +429,8 @@ export default function AdminPage() {
             {error && <div className="text-sm text-destructive font-medium">{error}</div>}
             
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="nhanvien@congty.com" />
+              <Label htmlFor="account">Tài khoản</Label>
+              <Input id="account" type="text" value={account} onChange={(e) => setAccount(e.target.value)} required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Mật khẩu khởi tạo</Label>
@@ -436,6 +449,11 @@ export default function AdminPage() {
                   onChange={(e) => setRole(e.target.value)}
                 >
                   <option value="staff">Nhân viên</option>
+                  <option value="deputy_head_of_dept">Phó Trưởng Phòng</option>
+                  <option value="head_of_dept">Trưởng Phòng</option>
+                  <option value="deputy_director">Phó Giám Đốc</option>
+                  <option value="director">Giám Đốc</option>
+                  <option value="ceo">Tổng Giám Đốc</option>
                   <option value="admin">Quản trị viên</option>
                 </select>
               </div>
@@ -484,6 +502,11 @@ export default function AdminPage() {
                   onChange={(e) => setEditRole(e.target.value)}
                 >
                   <option value="staff">Nhân viên</option>
+                  <option value="deputy_head_of_dept">Phó Trưởng Phòng</option>
+                  <option value="head_of_dept">Trưởng Phòng</option>
+                  <option value="deputy_director">Phó Giám Đốc</option>
+                  <option value="director">Giám Đốc</option>
+                  <option value="ceo">Tổng Giám Đốc</option>
                   <option value="admin">Quản trị viên</option>
                 </select>
               </div>

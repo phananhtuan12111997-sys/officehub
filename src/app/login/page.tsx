@@ -10,7 +10,7 @@ import { FileText, Eye, EyeOff } from "lucide-react"
 import { supabase } from "@/lib/supabase/client"
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("")
+  const [account, setAccount] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -22,8 +22,11 @@ export default function LoginPage() {
     setLoading(true)
     setError(null)
 
+    // Tự động nối đuôi email nội bộ nếu người dùng chỉ nhập tên tài khoản
+    const loginEmail = account.includes("@") ? account : `${account}@officehub.local`
+
     const { data, error } = await supabase.auth.signInWithPassword({
-      email,
+      email: loginEmail,
       password,
     })
 
@@ -50,7 +53,7 @@ export default function LoginPage() {
           <div className="flex items-center justify-center mb-2">
             <img src="/logo.png" alt="OfficeHub Logo" className="h-20 w-auto object-contain" />
           </div>
-          <CardTitle className="text-2xl font-bold">OfficeHub</CardTitle>
+          <CardTitle className="text-2xl font-bold text-primary">OfficeHub</CardTitle>
           <CardDescription>Đăng nhập vào hệ thống nội bộ</CardDescription>
         </CardHeader>
         <form onSubmit={handleLogin}>
@@ -61,13 +64,12 @@ export default function LoginPage() {
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="email">Email công ty</Label>
+              <Label htmlFor="account">Tài khoản công ty</Label>
               <Input 
-                id="email" 
-                type="email" 
-                placeholder="nv.a@company.com" 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="account" 
+                type="text" 
+                value={account}
+                onChange={(e) => setAccount(e.target.value)}
                 required 
               />
             </div>

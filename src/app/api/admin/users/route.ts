@@ -58,11 +58,11 @@ export async function POST(req: Request) {
   if (authError) return NextResponse.json({ error: authError.message }, { status: 400 })
 
   // Lưu ý: Trigger on_auth_user_created sẽ tự tạo row trong profiles.
-  // Tuy nhiên ta cần cập nhật full_name và role theo đúng form.
+  // Tuy nhiên ta cần cập nhật full_name và role theo đúng form, đồng thời bắt buộc user đổi mật khẩu.
   if (authData.user) {
     const { error: profileError } = await supabaseAdmin
       .from("profiles")
-      .update({ full_name, role: role || "staff", department_id })
+      .update({ full_name, role: role || "staff", department_id, force_password_change: true })
       .eq("id", authData.user.id)
 
     if (profileError) return NextResponse.json({ error: profileError.message }, { status: 400 })

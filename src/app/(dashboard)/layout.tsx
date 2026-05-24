@@ -4,6 +4,7 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase/client"
+import { ForcePasswordChangeModal } from "@/components/auth/force-password-modal"
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -21,5 +22,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     }
   }, [router])
 
-  return <DashboardLayout>{children}</DashboardLayout>
+  return (
+    <DashboardLayout>
+      {children}
+      <ForcePasswordChangeModal />
+    </DashboardLayout>
+  )
 }

@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
@@ -58,7 +58,7 @@ export default function FeedPage() {
   // Form state
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
-  const [department, setDepartment] = useState("Chung")
+  const [department, setDepartment] = useState("Tất cả")
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [isPinned, setIsPinned] = useState(false)
   const [pollData, setPollData] = useState<PollData | null>(null)
@@ -128,7 +128,8 @@ export default function FeedPage() {
           .eq("id", data.session.user.id)
           .single()
           .then(({ data: profile }) => {
-            if (profile?.role === "admin") setIsAdmin(true)
+            const managementRoles = ['admin', 'ceo', 'director', 'deputy_director', 'head_of_dept', 'deputy_head_of_dept']
+            if (managementRoles.includes(profile?.role)) setIsAdmin(true)
           })
       }
     })
@@ -136,6 +137,19 @@ export default function FeedPage() {
     supabase.from("departments").select("id, name").order("name").then(({ data }) => {
       if (data) setDepartments(data)
     })
+
+    const channel = supabase.channel('feed_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => {
+        fetchPosts(false, filterDept)
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, () => {
+        fetchPosts(false, filterDept)
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -219,7 +233,7 @@ export default function FeedPage() {
         
         let allNotifiedUserIds = new Set<string>()
 
-        if (department === "Chung") {
+        if (department === "Tất cả") {
           const { data: allUsers } = await supabase.from('profiles').select('id')
           if (allUsers) {
             const notifications = allUsers
@@ -291,7 +305,7 @@ export default function FeedPage() {
   const resetForm = () => {
     setTitle("")
     setContent("")
-    setDepartment("Chung")
+    setDepartment("Tất cả")
     setAttachments([])
     setIsPinned(false)
     setShowForm(false)
@@ -476,12 +490,12 @@ export default function FeedPage() {
                   </div>
                   <div className="flex flex-col gap-2">
                     <label className="text-sm font-semibold">Chuyên mục / Phòng ban</label>
-                    <Select value={department} onValueChange={(val) => setDepartment(val || "Chung")}>
+                    <Select value={department} onValueChange={(val) => setDepartment(val || "Tất cả")}>
                       <SelectTrigger className="border-primary/20 focus-visible:ring-primary/50">
                         <SelectValue placeholder="Chọn chuyên mục / phòng ban" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Chung">Chung</SelectItem>
+                        <SelectItem value="Tất cả">Tất Cả</SelectItem>
                         {departments.map((dept) => (
                           <SelectItem key={dept.id} value={dept.name}>
                             Phòng: {dept.name}
@@ -555,8 +569,7 @@ export default function FeedPage() {
           fetchPosts(false, val)
         }} className="w-full md:w-auto">
           <TabsList className="flex flex-wrap h-auto w-full justify-start bg-transparent">
-            <TabsTrigger value="all" className="data-active:bg-primary data-active:text-primary-foreground rounded-full px-4">Tất cả</TabsTrigger>
-            <TabsTrigger value="Chung" className="data-active:bg-primary data-active:text-primary-foreground rounded-full px-4">Thông báo chung</TabsTrigger>
+            <TabsTrigger value="all" className="data-active:bg-primary data-active:text-primary-foreground rounded-full px-4">Thông báo chung</TabsTrigger>
             {departments.map(d => (
               <TabsTrigger key={d.id} value={d.name} className="data-active:bg-primary data-active:text-primary-foreground rounded-full px-4">Phòng {d.name}</TabsTrigger>
             ))}
@@ -620,7 +633,7 @@ export default function FeedPage() {
                       post.is_pinned && <Pin className="h-4 w-4 text-red-500 fill-red-500" />
                     )}
                     <span className="text-xs font-semibold uppercase tracking-wider text-primary bg-primary/10 px-2 py-1 rounded-md">
-                      {post.department || "Tin tức"}
+                      {post.department === "Tất cả" ? "Tất Cả" : (post.department || "Tin tức")}
                     </span>
                     {!hasRead && (
                       <span className="w-2 h-2 rounded-full bg-blue-500" title="Chưa đọc" />
@@ -713,3 +726,4 @@ export default function FeedPage() {
     </div>
   )
 }
+

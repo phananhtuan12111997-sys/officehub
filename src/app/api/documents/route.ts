@@ -40,13 +40,18 @@ export async function DELETE(req: Request) {
 
 export async function PATCH(req: Request) {
   const body = await req.json()
-  const { id, name } = body
-  if (!id || !name) return NextResponse.json({ error: "Missing fields" }, { status: 400 })
+  const { id, name, is_pinned } = body
+  if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 })
+  if (name === undefined && is_pinned === undefined) return NextResponse.json({ error: "Missing fields" }, { status: 400 })
 
   const perm = await checkPermission(req, id)
   if (!perm.allowed) return NextResponse.json({ error: perm.error }, { status: 403 })
 
-  const { error } = await supabaseAdmin.from("documents").update({ name }).eq("id", id)
+  const updates: any = {}
+  if (name !== undefined) updates.name = name
+  if (is_pinned !== undefined) updates.is_pinned = is_pinned
+
+  const { error } = await supabaseAdmin.from("documents").update(updates).eq("id", id)
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
   return NextResponse.json({ success: true })
 }

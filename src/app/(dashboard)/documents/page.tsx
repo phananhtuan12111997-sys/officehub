@@ -12,13 +12,17 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { FileIcon, Search, Upload, Download, Loader2, Folder as FolderIcon, Plus, ChevronLeft, Eye, FileText, ImageIcon, FileSpreadsheet, FileIcon as FilePdf, Trash2, Edit2, Pin, LayoutGrid, List, ArrowUp, ArrowDown } from "lucide-react"
+import { FileIcon, Search, Upload, Download, Loader2, Folder as FolderIcon, Plus, ChevronLeft, Eye, FileText, ImageIcon, FileSpreadsheet, FileIcon as FilePdf, Trash2, Edit2, Pin, LayoutGrid, List, ArrowUp, ArrowDown, Check, Copy, FolderInput } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 import { supabase } from "@/lib/supabase/client"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { cn } from "@/lib/utils"
 import { FilePreview } from "@/components/ui/file-preview"
+
+import JSZip from "jszip"
+import { saveAs } from "file-saver"
 
 type DocumentType = {
   id: string
@@ -28,7 +32,9 @@ type DocumentType = {
   department: string
   created_at: string
   folder_id: string | null
+  is_pinned?: boolean
   uploaded_by: string | null
+  profiles?: { full_name: string } | null
 }
 
 type FolderType = {
@@ -38,6 +44,8 @@ type FolderType = {
   is_pinned?: boolean
   parent_id?: string | null
   created_at: string
+  created_by?: string | null
+  profiles?: { full_name: string } | null
 }
 
 export default function DocumentsPage() {
@@ -52,10 +60,16 @@ export default function DocumentsPage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   
+  // Selection State
+  const [isSelectMode, setIsSelectMode] = useState(false)
+  const [selectedItems, setSelectedItems] = useState<string[]>([])
+  const [isProcessingBulk, setIsProcessingBulk] = useState(false)
+
+
   // Create Folder State
   const [isFolderDialogOpen, setIsFolderDialogOpen] = useState(false)
   const [newFolderName, setNewFolderName] = useState("")
-  const [newFolderDepartment, setNewFolderDepartment] = useState("Chung")
+  const [newFolderDepartment, setNewFolderDepartment] = useState("Tất cả")
   const [creatingFolder, setCreatingFolder] = useState(false)
 
   // Preview State
@@ -88,6 +102,141 @@ export default function DocumentsPage() {
     setSortConfig({ key, direction });
   }
 
+  const toggleItemSelection = (itemId: string) => {
+    setSelectedItems(prev => 
+      prev.includes(itemId) ? prev.filter(id => id !== itemId) : [...prev, itemId]
+    )
+  }
+
+  const handleSelectAll = (selectAll: boolean) => {
+    if (selectAll) {
+      const allIds = [
+        ...sortedFolders.map(f => `f_${f.id}`),
+        ...sortedFiles.map(d => `d_${d.id}`)
+      ]
+      setSelectedItems(allIds)
+    } else {
+      setSelectedItems([])
+    }
+  }
+
+  const fetchFolderContentsRecursive = async (folderId: string): Promise<DocumentType[]> => {
+    const allDocs: DocumentType[] = []
+    
+    // Fetch docs in this folder
+    const { data: docs } = await supabase.from('documents').select('*').eq('folder_id', folderId)
+    if (docs) allDocs.push(...docs)
+
+    // Fetch subfolders
+    const { data: subFolders } = await supabase.from('document_folders').select('id').eq('parent_id', folderId)
+    if (subFolders) {
+      for (const sf of subFolders) {
+        const subDocs = await fetchFolderContentsRecursive(sf.id)
+        allDocs.push(...subDocs)
+      }
+    }
+    return allDocs
+  }
+
+  const handleDownloadBulk = async (itemIds: string[]) => {
+    setIsProcessingBulk(true)
+    try {
+      const zip = new JSZip()
+      let hasFiles = false
+
+      const fIds = itemIds.filter(id => id.startsWith("f_")).map(id => id.replace("f_", ""))
+      const dIds = itemIds.filter(id => id.startsWith("d_")).map(id => id.replace("d_", ""))
+
+      const docsToDownload: DocumentType[] = []
+
+      // Add selected docs
+      if (dIds.length > 0) {
+        const { data: docs } = await supabase.from('documents').select('*').in('id', dIds)
+        if (docs) docsToDownload.push(...docs)
+      }
+
+      // Add docs from selected folders
+      for (const fId of fIds) {
+        const folderDocs = await fetchFolderContentsRecursive(fId)
+        docsToDownload.push(...folderDocs)
+      }
+
+      if (docsToDownload.length === 0) {
+        alert("Không có file nào để tải xuống.")
+        setIsProcessingBulk(false)
+        return
+      }
+
+      for (const doc of docsToDownload) {
+        if (!doc.file_url) continue
+        
+        try {
+          const response = await fetch(doc.file_url)
+          const blob = await response.blob()
+          
+          let fileName = doc.name
+          if (zip.file(fileName)) {
+            fileName = `${doc.id.substring(0, 4)}_${fileName}`
+          }
+          zip.file(fileName, blob)
+          hasFiles = true
+        } catch (err) {
+          console.error("Error downloading file", doc.name, err)
+        }
+      }
+
+      if (hasFiles) {
+        const content = await zip.generateAsync({ type: "blob" })
+        saveAs(content, `TaiLieu_${new Date().getTime()}.zip`)
+      } else {
+        alert("Có lỗi khi tải các file.")
+      }
+
+    } catch (err) {
+      console.error(err)
+      alert("Lỗi tải xuống.")
+    } finally {
+      setIsProcessingBulk(false)
+      setSelectedItems([])
+      setIsSelectMode(false)
+    }
+  }
+
+  const handleDeleteBulk = async (itemIds: string[]) => {
+    if (!confirm(`Bạn có chắc chắn muốn xóa ${itemIds.length} mục đã chọn không?`)) return
+    setIsProcessingBulk(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+
+      const folderIds = itemIds.filter(id => id.startsWith('f_')).map(id => id.replace('f_', ''))
+      const fileIds = itemIds.filter(id => id.startsWith('d_')).map(id => id.replace('d_', ''))
+
+      const response = await fetch(`/api/documents/bulk-delete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ folderIds, fileIds })
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        alert("Lỗi: " + (data.error || "Không rõ nguyên nhân"))
+      } else {
+        fetchData()
+        setIsSelectMode(false)
+        setSelectedItems([])
+      }
+    } catch (err) {
+      console.error(err)
+      alert("Lỗi thực hiện thao tác.")
+    } finally {
+      setIsProcessingBulk(false)
+    }
+  }
+
   const parseSize = (sizeStr: string) => {
     if (!sizeStr || sizeStr === '-') return 0;
     const match = sizeStr.match(/([\d.]+)\s*(Bytes|KB|MB|GB)/i);
@@ -107,8 +256,8 @@ export default function DocumentsPage() {
           return sortConfig.direction === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
         }
         if (sortConfig.key === 'department') {
-          const deptA = a.department || "Chung";
-          const deptB = b.department || "Chung";
+          const deptA = a.department || "Tất cả";
+          const deptB = b.department || "Tất cả";
           return sortConfig.direction === 'asc' ? deptA.localeCompare(deptB) : deptB.localeCompare(deptA);
         }
         if (sortConfig.key === 'created_at') {
@@ -124,12 +273,13 @@ export default function DocumentsPage() {
     let sortableFiles = [...files];
     if (sortConfig) {
       sortableFiles.sort((a, b) => {
+        if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
         if (sortConfig.key === 'name') {
           return sortConfig.direction === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
         }
         if (sortConfig.key === 'department') {
-          const deptA = a.department || "Chung";
-          const deptB = b.department || "Chung";
+          const deptA = a.department || "Tất cả";
+          const deptB = b.department || "Tất cả";
           return sortConfig.direction === 'asc' ? deptA.localeCompare(deptB) : deptB.localeCompare(a.name);
         }
         if (sortConfig.key === 'created_at') {
@@ -151,14 +301,32 @@ export default function DocumentsPage() {
     return sortConfig.direction === 'asc' ? <ArrowUp className="inline w-3 h-3 ml-1" /> : <ArrowDown className="inline w-3 h-3 ml-1" />;
   }
   const [editFolderName, setEditFolderName] = useState("")
-  const [editFolderDepartment, setEditFolderDepartment] = useState("Chung")
+  const [editFolderDepartment, setEditFolderDepartment] = useState("Tất cả")
   const [isSavingFolderEdit, setIsSavingFolderEdit] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   
+  const fetchDataRef = useRef<() => void>(() => {})
+  useEffect(() => {
+    fetchDataRef.current = fetchData
+  })
+
   useEffect(() => {
     checkAdmin()
     fetchDepartments()
+
+    const channel = supabase.channel('documents_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, () => {
+        fetchDataRef.current()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'document_folders' }, () => {
+        fetchDataRef.current()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   useEffect(() => {
@@ -190,9 +358,10 @@ export default function DocumentsPage() {
       .eq("id", session.user.id)
       .single()
     
-    if (profile?.role === "admin") {
-      setIsAdmin(true)
-    }
+      const managementRoles = ['admin', 'ceo', 'director', 'deputy_director', 'head_of_dept', 'deputy_head_of_dept']
+      if (managementRoles.includes(profile?.role)) {
+        setIsAdmin(true)
+      }
   }
 
   const fetchData = async () => {
@@ -233,7 +402,7 @@ export default function DocumentsPage() {
       // Fetch Documents
       let url = '/api/documents?'
       if (searchQuery) {
-        url += `search=${encodeURIComponent(searchQuery)}`
+        url += `search=${encodeURIComponent(searchQuery)}&`
         setIsSearching(true)
       } else {
         setIsSearching(false)
@@ -290,7 +459,7 @@ export default function DocumentsPage() {
       alert("Lỗi tạo thư mục: " + (error.error || "Không thể tạo"))
     } else {
       setNewFolderName("")
-      setNewFolderDepartment("Chung")
+      setNewFolderDepartment("Tất cả")
       setIsFolderDialogOpen(false)
       fetchData()
     }
@@ -406,7 +575,7 @@ export default function DocumentsPage() {
             name: finalFileName,
             file_url: publicUrl,
             size: formatBytes(file.size),
-            department: currentFolder ? (currentFolder.department || "Chung") : "Chung",
+            department: currentFolder ? (currentFolder.department || "Tất cả") : "Tất cả",
             folder_id: currentFolder ? currentFolder.id : null,
             uploaded_by: currentUserId
           })
@@ -495,7 +664,7 @@ export default function DocumentsPage() {
   const handleEditFolder = (folder: FolderType) => {
     setEditingFolder(folder)
     setEditFolderName(folder.name)
-    setEditFolderDepartment(folder.department || "Chung")
+    setEditFolderDepartment(folder.department || "Tất cả")
   }
 
   const saveEditFolder = async (e: React.FormEvent) => {
@@ -547,6 +716,28 @@ export default function DocumentsPage() {
     }
   }
 
+  const handleTogglePinFile = async (e: React.MouseEvent, file: DocumentType) => {
+    e.stopPropagation()
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+
+    const res = await fetch('/api/documents', {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({ id: file.id, is_pinned: !file.is_pinned })
+    })
+
+    if (!res.ok) {
+      const errorData = await res.json()
+      alert("Lỗi ghim tài liệu: " + errorData.error)
+    } else {
+      fetchData()
+    }
+  }
+
   const handleDeleteFolder = async (id: string) => {
     if (!confirm("Bạn có chắc muốn xóa thư mục này? LƯU Ý: Bạn cần phải xóa hoặc di chuyển toàn bộ tài liệu bên trong trước khi xóa!")) return
 
@@ -588,44 +779,17 @@ export default function DocumentsPage() {
         <div>
           <h1 
             className="text-2xl font-bold tracking-tight text-primary cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => {
+              setCurrentFolder(null)
+              setSearchQuery("")
+              setFilterDept("all")
+              setIsSelectMode(false)
+              setSelectedItems([])
+            }}
           >
             Kho tài liệu
           </h1>
           <p className="text-muted-foreground">Lưu trữ, quản lý và chia sẻ văn bản nội bộ.</p>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto mt-2 sm:mt-0">
-          {isAdmin && (
-            <Button variant="outline" onClick={() => {
-              setNewFolderDepartment(currentFolder?.department || (filterDept !== "all" ? filterDept : "Chung"));
-              setIsFolderDialogOpen(true);
-            }} className="w-full sm:w-auto">
-              <Plus className="w-4 h-4 mr-2" />
-              Tạo thư mục
-            </Button>
-          )}
-          
-          <input 
-            type="file" 
-            className="hidden" 
-            ref={fileInputRef} 
-            onChange={handleFileChange} 
-          />
-          {currentFolder && (
-            <Button 
-              onClick={handleUploadClick} 
-              disabled={uploading} 
-              className="flex items-center gap-2 relative overflow-hidden"
-            >
-              {uploading ? <Loader2 className="w-4 h-4 animate-spin relative z-10" /> : <Upload className="w-4 h-4 relative z-10" />}
-              <span className="relative z-10">{uploading ? `Đang tải lên ${Math.round(uploadProgress)}%...` : "Tải lên tài liệu"}</span>
-              {uploading && (
-                <div 
-                  className="absolute left-0 top-0 bottom-0 bg-primary/20 transition-all duration-300"
-                  style={{ width: `${uploadProgress}%` }}
-                />
-              )}
-            </Button>
-          )}
         </div>
       </div>
 
@@ -638,7 +802,6 @@ export default function DocumentsPage() {
         }} className="w-full md:w-auto overflow-hidden">
           <TabsList className="flex h-auto w-full justify-start bg-transparent overflow-x-auto [&::-webkit-scrollbar]:hidden pb-1">
             <TabsTrigger value="all" className="data-active:bg-primary data-active:text-primary-foreground rounded-full px-4 whitespace-nowrap shrink-0">Tất cả</TabsTrigger>
-            <TabsTrigger value="Chung" className="data-active:bg-primary data-active:text-primary-foreground rounded-full px-4 whitespace-nowrap shrink-0">Chung</TabsTrigger>
             {departments.map(d => (
               <TabsTrigger key={d.id} value={d.name} className="data-active:bg-primary data-active:text-primary-foreground rounded-full px-4 whitespace-nowrap shrink-0">Phòng {d.name}</TabsTrigger>
             ))}
@@ -666,19 +829,81 @@ export default function DocumentsPage() {
         </div>
       </div>
 
+      {/* Action Buttons */}
+      <div className="flex flex-wrap items-center gap-2 w-full justify-end mt-2 mb-4">
+        {isSelectMode ? (
+          <>
+            <Button variant="outline" size="sm" onClick={() => { setIsSelectMode(false); setSelectedItems([]); }} className="hover:bg-primary/10 hover:text-primary transition-colors">
+              Hủy
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => handleSelectAll(selectedItems.length === 0)} className="hover:bg-primary/10 hover:text-primary transition-colors">
+              {selectedItems.length === 0 ? "Chọn tất cả" : "Bỏ chọn tất cả"}
+            </Button>
+            {selectedItems.length > 0 && (
+              <>
+                <Button variant="secondary" size="sm" onClick={() => handleDownloadBulk(selectedItems)} disabled={isProcessingBulk} className="hover:bg-primary/10 hover:text-primary transition-colors">
+                  {isProcessingBulk ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Download className="w-4 h-4 mr-1" />} Tải về ({selectedItems.length})
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => handleDeleteBulk(selectedItems)} disabled={isProcessingBulk} className="hover:bg-red-100 hover:text-red-600 text-red-500 transition-colors">
+                  {isProcessingBulk ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Trash2 className="w-4 h-4 mr-1" />} Xóa ({selectedItems.length})
+                </Button>
+              </>
+            )}
+          </>
+        ) : (
+          <Button variant="outline" size="sm" onClick={() => setIsSelectMode(true)} className="hover:bg-primary/10 hover:text-primary transition-colors">
+            <Check className="w-4 h-4 mr-2" />
+            Chọn nhiều
+          </Button>
+        )}
+
+        <Button variant="outline" size="sm" onClick={() => {
+          setNewFolderDepartment(currentFolder?.department || (filterDept !== "all" ? filterDept : "Tất cả"));
+          setIsFolderDialogOpen(true);
+        }} className="w-full sm:w-auto hover:bg-primary/10 hover:text-primary transition-colors">
+          <Plus className="w-4 h-4 mr-2" />
+          Tạo thư mục
+        </Button>
+        
+        <input 
+          type="file" 
+          className="hidden" 
+          ref={fileInputRef} 
+          onChange={handleFileChange} 
+        />
+        <Button 
+          size="sm"
+          onClick={handleUploadClick} 
+          disabled={uploading} 
+          className="flex items-center w-full sm:w-auto gap-2 relative overflow-hidden hover:opacity-90 transition-opacity"
+        >
+            {uploading ? <Loader2 className="w-4 h-4 animate-spin relative z-10" /> : <Upload className="w-4 h-4 relative z-10" />}
+            <span className="relative z-10">{uploading ? `Đang tải lên ${Math.round(uploadProgress)}%...` : "Tải lên tài liệu"}</span>
+            {uploading && (
+              <div 
+                className="absolute left-0 top-0 bottom-0 bg-primary/20 transition-all duration-300"
+                style={{ width: `${uploadProgress}%` }}
+              />
+            )}
+          </Button>
+      </div>
+
+
       {/* Breadcrumb */}
       {(currentFolder || isSearching) && (
         <div className="flex flex-col sm:flex-row items-center justify-between bg-card p-4 rounded-xl border shadow-sm gap-4 mb-4">
           <div className="flex items-center gap-2 flex-1">
             {currentFolder ? (
               <Button variant="ghost" size="sm" onClick={() => { 
-                if (currentFolder.parent_id) {
+                if (currentFolder && currentFolder.parent_id) {
                   const parentFolder = folders.find(f => f.id === currentFolder.parent_id)
                   setCurrentFolder(parentFolder || null)
                 } else {
                   setCurrentFolder(null)
                 }
                 setSearchQuery(""); 
+                setIsSelectMode(false);
+                setSelectedItems([]);
               }} className="px-2">
                 <ChevronLeft className="w-4 h-4 mr-1" />
                 Quay lại
@@ -698,7 +923,7 @@ export default function DocumentsPage() {
             
             {currentFolder && !isSearching && (
               <Badge variant="secondary" className="ml-2 font-normal">
-                Phòng ban: {currentFolder.department || "Chung"}
+                Phòng ban: {(currentFolder.department === "Tất cả" || !currentFolder.department) ? "Tất Cả" : currentFolder.department}
               </Badge>
             )}
           </div>
@@ -725,6 +950,7 @@ export default function DocumentsPage() {
             <TableRow>
               <TableHead onClick={() => handleSort('name')} className="cursor-pointer hover:text-primary select-none">Tên tài liệu / Thư mục <SortIcon columnKey="name" /></TableHead>
               <TableHead onClick={() => handleSort('department')} className="cursor-pointer hover:text-primary select-none">Phòng ban <SortIcon columnKey="department" /></TableHead>
+              <TableHead className="select-none">Người tạo</TableHead>
               <TableHead onClick={() => handleSort('created_at')} className="cursor-pointer hover:text-primary select-none">Ngày tạo <SortIcon columnKey="created_at" /></TableHead>
               <TableHead onClick={() => handleSort('size')} className="cursor-pointer hover:text-primary select-none">Kích thước <SortIcon columnKey="size" /></TableHead>
               <TableHead className="w-[100px] text-right">Thao tác</TableHead>
@@ -733,13 +959,13 @@ export default function DocumentsPage() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center">
+                <TableCell colSpan={6} className="h-24 text-center">
                   <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
                 </TableCell>
               </TableRow>
             ) : (files.length === 0 && (searchQuery || currentFolder || folders.length === 0)) ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                   Trống.
                 </TableCell>
               </TableRow>
@@ -748,14 +974,25 @@ export default function DocumentsPage() {
                 {/* Render Folders (only if not searching) */}
                 {!isSearching && sortedFolders
                   .filter(f => currentFolder ? f.parent_id === currentFolder.id : !f.parent_id)
-                  .filter(f => filterDept === "all" ? true : (f.department || "Chung") === filterDept)
+                  .filter(f => filterDept === "all" ? true : (f.department || "Tất cả") === filterDept)
                   .map((folder) => (
                   <TableRow 
                     key={folder.id} 
-                    className="cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => setCurrentFolder(folder)}
+                    className={cn("cursor-pointer hover:bg-muted/50 transition-colors", isSelectMode && selectedItems.includes(`f_${folder.id}`) ? "bg-primary/5" : "")}
+                    onClick={() => {
+                      if (isSelectMode) toggleItemSelection(`f_${folder.id}`)
+                      else setCurrentFolder(folder)
+                    }}
                   >
                     <TableCell className="font-medium flex items-center gap-3">
+                      {isSelectMode && (
+                        <div className={cn(
+                          "w-4 h-4 rounded border flex items-center justify-center shrink-0",
+                          selectedItems.includes(`f_${folder.id}`) ? "bg-primary border-primary text-primary-foreground" : "border-input bg-background"
+                        )}>
+                          {selectedItems.includes(`f_${folder.id}`) && <Check className="w-3 h-3" />}
+                        </div>
+                      )}
                       <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg relative">
                         <FolderIcon className="w-5 h-5 text-yellow-600 dark:text-yellow-500 fill-yellow-200 dark:fill-yellow-900/50" />
                         {folder.is_pinned && (
@@ -767,48 +1004,80 @@ export default function DocumentsPage() {
                       {folder.name}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className="font-normal">{folder.department || "Chung"}</Badge>
+                      <Badge variant="secondary" className="font-normal">{(folder.department === "Tất cả" || !folder.department) ? "Tất Cả" : folder.department}</Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {folder.profiles?.full_name || "Không rõ"}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {new Date(folder.created_at).toLocaleDateString('vi-VN')}
                     </TableCell>
                     <TableCell className="text-muted-foreground">-</TableCell>
                     <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDownloadBulk([`f_${folder.id}`]); }} title="Tải về">
+                          <Download className="w-4 h-4 text-green-500" />
+                        </Button>
                       {isAdmin && (
-                        <div className="flex items-center justify-end gap-2">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={(e) => handleTogglePinFolder(e, folder)}
-                            title={folder.is_pinned ? "Bỏ ghim" : "Ghim thư mục"}
-                          >
-                            <Pin className={`w-4 h-4 ${folder.is_pinned ? "fill-primary text-primary" : "text-muted-foreground"}`} />
-                          </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={(e) => handleTogglePinFolder(e, folder)}
+                          title={folder.is_pinned ? "Bỏ ghim" : "Ghim thư mục"}
+                        >
+                          <Pin className={`w-4 h-4 ${folder.is_pinned ? "fill-primary text-primary" : "text-muted-foreground"}`} />
+                        </Button>
+                      )}
+                      {(isAdmin || (folder.created_by && folder.created_by === currentUserId)) && (
+                        <>
                           <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEditFolder(folder); }}>
                             <Edit2 className="w-4 h-4 text-blue-500" />
                           </Button>
                           <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder.id); }}>
                             <Trash2 className="w-4 h-4 text-red-500" />
                           </Button>
-                        </div>
+                        </>
                       )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
 
                 {/* Render Files */}
                 {sortedFiles
-                  .filter(f => filterDept === "all" || currentFolder ? true : (f.department || "Chung") === filterDept)
+                  .filter(f => filterDept === "all" || currentFolder ? true : (f.department || "Tất cả") === filterDept)
                   .map((file) => (
-                  <TableRow key={file.id} className="hover:bg-muted/30">
-                    <TableCell className="font-medium flex items-center gap-3 cursor-pointer" onClick={() => setPreviewFile(file)}>
-                      <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg">
+                  <TableRow key={file.id} 
+                    className={cn("hover:bg-muted/30 transition-colors cursor-pointer", isSelectMode && selectedItems.includes(`d_${file.id}`) ? "bg-primary/5" : "")}
+                    onClick={() => {
+                      if (isSelectMode) toggleItemSelection(`d_${file.id}`)
+                      else setPreviewFile(file)
+                    }}
+                  >
+                    <TableCell className="font-medium flex items-center gap-3">
+                      {isSelectMode && (
+                        <div className={cn(
+                          "w-4 h-4 rounded border flex items-center justify-center shrink-0",
+                          selectedItems.includes(`d_${file.id}`) ? "bg-primary border-primary text-primary-foreground" : "border-input bg-background"
+                        )}>
+                          {selectedItems.includes(`d_${file.id}`) && <Check className="w-3 h-3" />}
+                        </div>
+                      )}
+                      <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg relative">
                         {getFileIcon(file.name)}
+                        {file.is_pinned && (
+                          <div className="absolute -top-1 -right-1 bg-primary text-primary-foreground rounded-full p-0.5 shadow-sm">
+                            <Pin className="w-3 h-3 fill-current" />
+                          </div>
+                        )}
                       </div>
                       <span className="hover:underline">{file.name}</span>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className="font-normal">{file.department || "Chung"}</Badge>
+                      <Badge variant="secondary" className="font-normal">{(file.department === "Tất cả" || !file.department) ? "Tất Cả" : file.department}</Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {file.profiles?.full_name || "Không rõ"}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {new Date(file.created_at).toLocaleDateString('vi-VN')}
@@ -816,46 +1085,44 @@ export default function DocumentsPage() {
                     <TableCell className="text-muted-foreground">{file.size}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
-                        {(isAdmin || file.uploaded_by === currentUserId) && (
-                          <>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              onClick={(e) => handleEdit(e, file)}
-                              className="text-muted-foreground hover:text-primary"
-                              title="Đổi tên"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              onClick={(e) => handleDelete(e, file.id)}
-                              className="text-muted-foreground hover:text-destructive"
-                              title="Xóa"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </>
-                        )}
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => setPreviewFile(file)}
-                          className="text-muted-foreground hover:text-primary"
-                          title="Xem trước"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
                         <Button 
                           variant="ghost" 
                           size="icon" 
                           onClick={(e) => handleDownload(e, file.file_url, file.name)}
-                          className="text-muted-foreground hover:text-primary"
                           title="Tải xuống"
                         >
-                          <Download className="w-4 h-4" />
+                          <Download className="w-4 h-4 text-green-500" />
                         </Button>
+                        {isAdmin && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={(e) => handleTogglePinFile(e, file)}
+                            title={file.is_pinned ? "Bỏ ghim" : "Ghim tài liệu"}
+                          >
+                            <Pin className={`w-4 h-4 ${file.is_pinned ? "fill-primary text-primary" : "text-muted-foreground"}`} />
+                          </Button>
+                        )}
+                        {(isAdmin || file.uploaded_by === currentUserId) && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={(e) => handleEdit(e, file)}
+                            title="Đổi tên"
+                          >
+                            <Edit2 className="w-4 h-4 text-blue-500" />
+                          </Button>
+                        )}
+                        {(isAdmin || file.uploaded_by === currentUserId) && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={(e) => handleDelete(e, file.id)}
+                            title="Xóa"
+                          >
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -877,21 +1144,40 @@ export default function DocumentsPage() {
                 <>
                   {!isSearching && sortedFolders
                     .filter(f => currentFolder ? f.parent_id === currentFolder.id : !f.parent_id)
-                    .filter(f => filterDept === "all" ? true : (f.department || "Chung") === filterDept)
+                    .filter(f => filterDept === "all" ? true : (f.department || "Tất cả") === filterDept)
                     .map(folder => (
-                    <div key={folder.id} onClick={() => setCurrentFolder(folder)} className="border rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 hover:border-primary/50 transition-colors group relative bg-card shadow-sm">
-                      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div key={folder.id} 
+                      onClick={() => {
+                        if (isSelectMode) toggleItemSelection(`f_${folder.id}`)
+                        else setCurrentFolder(folder)
+                      }} 
+                      className={cn("border rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 hover:border-primary/50 transition-colors group relative shadow-sm", isSelectMode && selectedItems.includes(`f_${folder.id}`) ? "bg-primary/5 border-primary" : "bg-card")}
+                    >
+                      {isSelectMode && (
+                        <div className="absolute top-2 left-2 flex gap-1 z-10">
+                          <div className={cn(
+                            "w-5 h-5 rounded border flex items-center justify-center shrink-0",
+                            selectedItems.includes(`f_${folder.id}`) ? "bg-primary border-primary text-primary-foreground" : "border-input bg-background"
+                          )}>
+                            {selectedItems.includes(`f_${folder.id}`) && <Check className="w-3 h-3" />}
+                          </div>
+                        </div>
+                      )}
+                      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 backdrop-blur-sm rounded-md p-1 shadow-sm z-10">
+                         <Button variant="ghost" size="icon" className="h-6 w-6 text-green-500" onClick={(e) => { e.stopPropagation(); handleDownloadBulk([`f_${folder.id}`]); }} title="Tải về">
+                           <Download className="w-3 h-3" />
+                         </Button>
                          {isAdmin && (
                             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => handleTogglePinFolder(e, folder)} title={folder.is_pinned ? "Bỏ ghim" : "Ghim"}>
                               <Pin className={`w-3 h-3 ${folder.is_pinned ? "fill-primary text-primary" : ""}`} />
                             </Button>
                          )}
-                         {isAdmin && (
-                            <Button variant="ghost" size="icon" className="h-6 w-6 text-yellow-600" onClick={(e) => { e.stopPropagation(); handleEditFolder(folder); }}>
-                              <Edit2 className="w-3 h-3" />
+                         {(isAdmin || (folder.created_by && folder.created_by === currentUserId)) && (
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); handleEditFolder(folder); }}>
+                              <Edit2 className="w-3 h-3 text-blue-500" />
                             </Button>
                          )}
-                         {isAdmin && (
+                         {(isAdmin || (folder.created_by && folder.created_by === currentUserId)) && (
                             <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder.id); }}>
                               <Trash2 className="w-3 h-3" />
                             </Button>
@@ -906,21 +1192,43 @@ export default function DocumentsPage() {
                         )}
                       </div>
                       <span className="text-center text-sm font-medium line-clamp-2 w-full px-2" title={folder.name}>{folder.name}</span>
-                      <span className="text-xs text-muted-foreground mt-1 bg-secondary px-2 rounded-full">{folder.department || "Chung"}</span>
+                      <span className="text-xs text-muted-foreground mt-1 truncate px-2 w-full text-center">{folder.profiles?.full_name || "Không rõ"}</span>
+                      <span className="text-xs text-muted-foreground mt-1 bg-secondary px-2 rounded-full">{(folder.department === "Tất cả" || !folder.department) ? "Tất Cả" : folder.department}</span>
                     </div>
                   ))}
                   
                   {sortedFiles
-                    .filter(f => filterDept === "all" || currentFolder ? true : (f.department || "Chung") === filterDept)
+                    .filter(f => filterDept === "all" || currentFolder ? true : (f.department || "Tất cả") === filterDept)
                     .map(file => (
-                    <div key={file.id} onClick={() => setPreviewFile(file)} className="border rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 hover:border-primary/50 transition-colors group relative bg-card shadow-sm">
-                      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 backdrop-blur-sm rounded-md p-1 shadow-sm">
-                         <Button variant="ghost" size="icon" className="h-6 w-6 text-blue-500" onClick={(e) => handleDownload(e, file.file_url, file.name)} title="Tải xuống">
-                           <Download className="w-3 h-3" />
+                    <div key={file.id} 
+                      onClick={() => {
+                        if (isSelectMode) toggleItemSelection(`d_${file.id}`)
+                        else setPreviewFile(file)
+                      }} 
+                      className={cn("border rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 hover:border-primary/50 transition-colors group relative shadow-sm", isSelectMode && selectedItems.includes(`d_${file.id}`) ? "bg-primary/5 border-primary" : "bg-card")}
+                    >
+                      {isSelectMode && (
+                        <div className="absolute top-2 left-2 flex gap-1 z-10">
+                          <div className={cn(
+                            "w-5 h-5 rounded border flex items-center justify-center shrink-0",
+                            selectedItems.includes(`d_${file.id}`) ? "bg-primary border-primary text-primary-foreground" : "border-input bg-background"
+                          )}>
+                            {selectedItems.includes(`d_${file.id}`) && <Check className="w-3 h-3" />}
+                          </div>
+                        </div>
+                      )}
+                      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 backdrop-blur-sm rounded-md p-1 shadow-sm z-10">
+                         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => handleDownload(e, file.file_url, file.name)} title="Tải xuống">
+                           <Download className="w-3 h-3 text-green-500" />
                          </Button>
+                         {isAdmin && (
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => handleTogglePinFile(e, file)} title={file.is_pinned ? "Bỏ ghim" : "Ghim"}>
+                              <Pin className={`w-3 h-3 ${file.is_pinned ? "fill-primary text-primary" : "text-muted-foreground"}`} />
+                            </Button>
+                         )}
                          {(isAdmin || currentUserId === file.uploaded_by) && (
-                            <Button variant="ghost" size="icon" className="h-6 w-6 text-yellow-600" onClick={(e) => handleEdit(e, file)} title="Đổi tên">
-                              <Edit2 className="w-3 h-3" />
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => handleEdit(e, file)} title="Đổi tên">
+                              <Edit2 className="w-3 h-3 text-blue-500" />
                             </Button>
                          )}
                          {(isAdmin || currentUserId === file.uploaded_by) && (
@@ -933,6 +1241,7 @@ export default function DocumentsPage() {
                          {getFileIcon(file.name)}
                       </div>
                       <span className="text-center text-sm font-medium line-clamp-2 w-full px-2" title={file.name}>{file.name}</span>
+                      <span className="text-xs text-muted-foreground mt-1 truncate px-2 w-full text-center">{file.profiles?.full_name || "Không rõ"}</span>
                       <span className="text-xs text-muted-foreground mt-1">{file.size}</span>
                     </div>
                   ))}
@@ -964,12 +1273,12 @@ export default function DocumentsPage() {
             {!currentFolder && (
               <div className="space-y-2">
                 <label className="text-sm font-medium">Phòng ban (Phân loại theo bộ phận)</label>
-                <Select value={newFolderDepartment} onValueChange={(val) => setNewFolderDepartment(val || "Chung")}>
+                <Select value={newFolderDepartment} onValueChange={(val) => setNewFolderDepartment(val || "Tất cả")}>
                   <SelectTrigger>
                     <SelectValue placeholder="Chọn phòng ban" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Chung">Chung (Tất cả phòng ban)</SelectItem>
+                    <SelectItem value="Tất cả">Tất Cả</SelectItem>
                     {departments.map((dept) => (
                       <SelectItem key={dept.id} value={dept.name}>Phòng {dept.name}</SelectItem>
                     ))}
@@ -1039,12 +1348,12 @@ export default function DocumentsPage() {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Phòng ban (Phân loại theo bộ phận)</label>
-              <Select value={editFolderDepartment} onValueChange={(val) => setEditFolderDepartment(val || "Chung")}>
+              <Select value={editFolderDepartment} onValueChange={(val) => setEditFolderDepartment(val || "Tất cả")}>
                 <SelectTrigger>
                   <SelectValue placeholder="Chọn phòng ban" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Chung">Chung</SelectItem>
+                  <SelectItem value="Tất cả">Tất Cả</SelectItem>
                   {departments.map(d => (
                     <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
                   ))}
@@ -1061,6 +1370,8 @@ export default function DocumentsPage() {
           </form>
         </DialogContent>
       </Dialog>
+
     </div>
   )
 }
+

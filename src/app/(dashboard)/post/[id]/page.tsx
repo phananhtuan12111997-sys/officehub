@@ -145,6 +145,21 @@ export default function PostDetailPage() {
 
   useEffect(() => {
     fetchPost()
+
+    if (id) {
+      const channel = supabase.channel(`post_detail_${id}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'posts', filter: `id=eq.${id}` }, () => {
+          fetchPost()
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'comments', filter: `post_id=eq.${id}` }, () => {
+          fetchPost()
+        })
+        .subscribe()
+
+      return () => {
+        supabase.removeChannel(channel)
+      }
+    }
   }, [id])
 
   if (loading) {

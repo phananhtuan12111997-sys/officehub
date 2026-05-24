@@ -34,17 +34,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Cannot fetch profile" }, { status: 403 })
     }
 
-    if (profile?.role !== "admin") {
-      console.log("Not admin:", profile)
-      return NextResponse.json({ error: "Admin only" }, { status: 403 })
-    }
-
     const { name, department, parent_id } = await req.json()
     console.log("Inserting folder:", name, "for department:", department, "parent:", parent_id)
     const { data, error } = await supabaseAdmin.from("document_folders").insert({ 
       name, 
       department: department || 'Chung',
-      parent_id: parent_id || null
+      parent_id: parent_id || null,
+      created_by: user.id
     }).select()
 
     if (error) {
@@ -77,7 +73,10 @@ export async function GET(req: Request) {
 
     let query = supabaseAdmin
       .from("document_folders")
-      .select("*")
+      .select(`
+        *,
+        profiles(full_name)
+      `)
       // To support `is_pinned`, make sure you ran the SQL command to add it to the table.
       // If it's not present, this sort might fail. But we assume it will be there.
       .order("is_pinned", { ascending: false, nullsFirst: false })
@@ -138,12 +137,18 @@ export async function DELETE(req: Request) {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
     if (authError || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
 
-    const { data: profile } = await supabaseAdmin.from("profiles").select("role").eq("id", user.id).single()
-    if (profile?.role !== "admin") return NextResponse.json({ error: "Admin only" }, { status: 403 })
-
     const { searchParams } = new URL(req.url)
     const id = searchParams.get("id")
     if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 })
+
+    const { data: profile } = await supabaseAdmin.from("profiles").select("role").eq("id", user.id).single()
+    const { data: folder } = await supabaseAdmin.from("document_folders").select("created_by").eq("id", id).single()
+
+    if (!folder) return NextResponse.json({ error: "Not found" }, { status: 404 })
+    
+    if (profile?.role !== "admin" && folder.created_by !== user.id) {
+      return NextResponse.json({ error: "Only creator or admin can delete" }, { status: 403 })
+    }
 
     const { error } = await supabaseAdmin.from("document_folders").delete().eq("id", id)
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })

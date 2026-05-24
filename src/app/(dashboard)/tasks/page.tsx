@@ -65,6 +65,15 @@ function TasksContent() {
   const [filterAssignee, setFilterAssignee] = useState('all')
   const [activeMobileTab, setActiveMobileTab] = useState<string>('new')
 
+  const [columnLimits, setColumnLimits] = useState<Record<string, number>>({
+    'new': 3,
+    'in-progress': 3,
+    'review': 3,
+    'completed': 3
+  })
+  
+  const [listLimit, setListLimit] = useState(3)
+
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [assigneeId, setAssigneeId] = useState("")
@@ -432,6 +441,27 @@ function TasksContent() {
   const isAdmin = currentUserProfile?.role === 'admin'
   const currentUserDepartmentId = currentUserProfile?.department_id
 
+  const getRoleRank = (role?: string) => {
+    switch (role) {
+      case 'admin': return 0;
+      case 'ceo': return 1;
+      case 'director': return 2;
+      case 'deputy_director': return 3;
+      case 'head_of_dept': return 4;
+      case 'deputy_head_of_dept': return 5;
+      case 'staff': return 6;
+      default: return 6;
+    }
+  }
+
+  const currentUserRank = getRoleRank(currentUserProfile?.role)
+
+  const assignableUsers = users.filter(user => {
+    const userRank = getRoleRank(user.role)
+    if (userRank === 0 && currentUserRank !== 0) return false;
+    return userRank >= currentUserRank;
+  })
+
   const visibleTasks = tasks.filter(t => {
     let hasAccess = false
     if (isAdmin) hasAccess = true
@@ -439,7 +469,7 @@ function TasksContent() {
     
     if (!hasAccess) return false
 
-    if (searchQuery && !t.title.toLowerCase().includes(searchQuery.toLowerCase())) return false
+    if (searchQuery && !(t.title || "").toLowerCase().includes(searchQuery.toLowerCase())) return false
 
     if (filterPriority !== 'all' && t.priority !== filterPriority) return false
 
@@ -481,7 +511,12 @@ function TasksContent() {
         <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
           <Select value={filterPriority} onValueChange={(val) => setFilterPriority(val || "all")}>
             <SelectTrigger className="w-[130px] bg-background">
-              <SelectValue placeholder="Ưu tiên" />
+              <SelectValue placeholder="Ưu tiên">
+                {filterPriority === 'all' && 'Mọi ưu tiên'}
+                {filterPriority === 'high' && 'Cao'}
+                {filterPriority === 'medium' && 'Trung bình'}
+                {filterPriority === 'low' && 'Thấp'}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Mọi ưu tiên</SelectItem>
@@ -492,7 +527,10 @@ function TasksContent() {
           </Select>
           <Select value={filterAssignee} onValueChange={(val) => setFilterAssignee(val || "all")}>
             <SelectTrigger className="w-[140px] bg-background">
-              <SelectValue placeholder="Người nhận" />
+              <SelectValue placeholder="Người nhận">
+                {filterAssignee === 'all' && 'Tất cả mọi người'}
+                {filterAssignee === 'me' && 'Việc của tôi'}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Tất cả mọi người</SelectItem>
@@ -592,7 +630,7 @@ function TasksContent() {
                         <CommandList>
                           <CommandEmpty>Không tìm thấy nhân viên.</CommandEmpty>
                           <CommandGroup>
-                            {users.map((user) => (
+                            {assignableUsers.map((user) => (
                               <CommandItem
                                 key={user.id}
                                 value={user.full_name + ' ' + user.email}
@@ -773,7 +811,7 @@ function TasksContent() {
                               </div>
                             )}
                             
-                            {colTasks.map((task, index) => (
+                            {colTasks.slice(0, columnLimits[col.id]).map((task, index) => (
                               <Draggable key={task.id} draggableId={task.id} index={index}>
                                 {(provided, snapshot) => (
                                   <div
@@ -828,6 +866,22 @@ function TasksContent() {
                                 )}
                               </Draggable>
                             ))}
+                            
+                            {colTasks.length > columnLimits[col.id] && (
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="w-full mt-2 text-muted-foreground hover:text-primary"
+                                onClick={() => {
+                                  setColumnLimits(prev => ({
+                                    ...prev,
+                                    [col.id]: prev[col.id] + 10
+                                  }))
+                                }}
+                              >
+                                Xem thêm ({colTasks.length - columnLimits[col.id]})
+                              </Button>
+                            )}
                             {provided.placeholder}
                           </div>
                         )}
@@ -859,23 +913,39 @@ function TasksContent() {
                         <td colSpan={5} className="text-center py-8 text-muted-foreground">Không có công việc nào</td>
                       </tr>
                     ) : (
-                      visibleTasks.map((task) => (
-                        <tr key={task.id} className="border-b hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => setSelectedTask(task)}>
-                          <td className="px-4 py-3 font-medium text-primary">{task.title}</td>
-                          <td className="px-4 py-3">
-                            <Badge variant="secondary">{COLUMNS.find(c => c.id === task.status)?.title}</Badge>
-                          </td>
-                          <td className="px-4 py-3 text-muted-foreground">{task.assignee}</td>
-                          <td className="px-4 py-3">
-                            <Badge variant="outline" className={`text-xs px-1 ${getPriorityColor(task.priority)}`}>
-                              {getPriorityLabel(task.priority)}
-                            </Badge>
-                          </td>
-                          <td className={cn("px-4 py-3", getDueDateColor(task.due_date_timestamp, task.due_date))}>
-                            {task.due_date_timestamp ? new Date(task.due_date_timestamp).toLocaleDateString('vi-VN') : task.due_date}
-                          </td>
-                        </tr>
-                      ))
+                      <>
+                        {visibleTasks.slice(0, listLimit).map((task) => (
+                          <tr key={task.id} className="border-b hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => setSelectedTask(task)}>
+                            <td className="px-4 py-3 font-medium text-primary">{task.title}</td>
+                            <td className="px-4 py-3">
+                              <Badge variant="secondary">{COLUMNS.find(c => c.id === task.status)?.title}</Badge>
+                            </td>
+                            <td className="px-4 py-3 text-muted-foreground">{task.assignee}</td>
+                            <td className="px-4 py-3">
+                              <Badge variant="outline" className={`text-xs px-1 ${getPriorityColor(task.priority)}`}>
+                                {getPriorityLabel(task.priority)}
+                              </Badge>
+                            </td>
+                            <td className={cn("px-4 py-3", getDueDateColor(task.due_date_timestamp, task.due_date))}>
+                              {task.due_date_timestamp ? new Date(task.due_date_timestamp).toLocaleDateString('vi-VN') : task.due_date}
+                            </td>
+                          </tr>
+                        ))}
+                        {visibleTasks.length > listLimit && (
+                          <tr>
+                            <td colSpan={5} className="p-2">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="w-full text-muted-foreground hover:text-primary"
+                                onClick={() => setListLimit(prev => prev + 10)}
+                              >
+                                Xem thêm ({visibleTasks.length - listLimit})
+                              </Button>
+                            </td>
+                          </tr>
+                        )}
+                      </>
                     )}
                   </tbody>
                 </table>
@@ -1010,7 +1080,7 @@ function TasksContent() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Không chọn</SelectItem>
-                      {users.map(u => (
+                      {assignableUsers.map(u => (
                         <SelectItem key={u.id} value={u.id}>{u.full_name}</SelectItem>
                       ))}
                     </SelectContent>
