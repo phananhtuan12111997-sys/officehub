@@ -601,10 +601,10 @@ function InboxContent() {
         <div className={`flex flex-col w-full md:w-1/3 border rounded-lg bg-card shadow-sm overflow-hidden ${readingMessage ? 'hidden md:flex' : 'flex'}`}>
           <Tabs defaultValue="inbox" className="w-full flex flex-col h-full" onValueChange={(v) => { setViewMode(v as any); handleCloseMessage(); setSelectedMails(new Set()); }}>
             <div className="p-2 border-b shrink-0 bg-muted/20">
-              <TabsList className="grid w-full grid-cols-3 bg-muted/50">
-                <TabsTrigger value="inbox" className="data-active:bg-primary data-active:text-primary-foreground">Hộp thư đến</TabsTrigger>
-                <TabsTrigger value="sent" className="data-active:bg-primary data-active:text-primary-foreground">Đã gửi</TabsTrigger>
-                <TabsTrigger value="trash" className="data-active:bg-primary data-active:text-primary-foreground">Thùng rác</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-3 bg-muted/50 h-auto min-h-10">
+                <TabsTrigger value="inbox" className="text-xs sm:text-sm data-active:bg-primary data-active:text-primary-foreground whitespace-normal break-words py-1.5">Hộp thư đến</TabsTrigger>
+                <TabsTrigger value="sent" className="text-xs sm:text-sm data-active:bg-primary data-active:text-primary-foreground whitespace-normal break-words py-1.5">Đã gửi</TabsTrigger>
+                <TabsTrigger value="trash" className="text-xs sm:text-sm data-active:bg-primary data-active:text-primary-foreground whitespace-normal break-words py-1.5">Thùng rác</TabsTrigger>
               </TabsList>
               <div className="relative mt-2">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />

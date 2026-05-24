@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
@@ -567,11 +567,11 @@ export default function FeedPage() {
         <Tabs defaultValue="all" value={filterDept} onValueChange={(val) => {
           setFilterDept(val)
           fetchPosts(false, val)
-        }} className="w-full md:w-auto">
-          <TabsList className="flex flex-wrap h-auto w-full justify-start bg-transparent">
-            <TabsTrigger value="all" className="data-active:bg-primary data-active:text-primary-foreground rounded-full px-4">Thông báo chung</TabsTrigger>
+        }} className="w-full md:w-auto overflow-hidden">
+          <TabsList className="flex h-auto w-full justify-start bg-transparent overflow-x-auto [&::-webkit-scrollbar]:hidden pb-1">
+            <TabsTrigger value="all" className="py-1.5 data-active:bg-primary data-active:text-primary-foreground rounded-full px-4 whitespace-nowrap shrink-0">Thông báo chung</TabsTrigger>
             {departments.map(d => (
-              <TabsTrigger key={d.id} value={d.name} className="data-active:bg-primary data-active:text-primary-foreground rounded-full px-4">Phòng {d.name}</TabsTrigger>
+              <TabsTrigger key={d.id} value={d.name} className="py-1.5 data-active:bg-primary data-active:text-primary-foreground rounded-full px-4 whitespace-nowrap shrink-0">Phòng {d.name}</TabsTrigger>
             ))}
           </TabsList>
         </Tabs>
