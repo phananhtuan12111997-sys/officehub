@@ -35,13 +35,13 @@ export async function POST(req: Request) {
     const isAdmin = profile?.role === 'admin'
 
     // Process each item (can be folder or file)
-    let foldersToProcess = []
+    let foldersToProcess: any[] = []
     if (folderIds && folderIds.length > 0) {
       const { data } = await supabaseAdmin.from('document_folders').select('id, created_by').in('id', folderIds)
       if (data) foldersToProcess = data
     }
     
-    let filesToProcess = []
+    let filesToProcess: any[] = []
     if (fileIds && fileIds.length > 0) {
       const { data } = await supabaseAdmin.from('documents').select('id, file_url, uploaded_by').in('id', fileIds)
       if (data) filesToProcess = data
