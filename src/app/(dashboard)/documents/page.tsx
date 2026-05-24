@@ -207,7 +207,7 @@ export default function DocumentsPage() {
       const promises = []
 
       // Fetch Folders
-      if (!searchQuery && !currentFolder) {
+      if (!searchQuery) {
         promises.push(
           fetch('/api/documents/folders', {
             headers: { Authorization: `Bearer ${session.access_token}` }
@@ -578,7 +578,6 @@ export default function DocumentsPage() {
         <div>
           <h1 
             className="text-2xl font-bold tracking-tight text-primary cursor-pointer hover:opacity-80 transition-opacity"
-            onClick={() => window.location.href = '/documents'}
           >
             Kho tài liệu
           </h1>
@@ -586,7 +585,10 @@ export default function DocumentsPage() {
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto mt-2 sm:mt-0">
           {isAdmin && (
-            <Button variant="outline" onClick={() => setIsFolderDialogOpen(true)} className="w-full sm:w-auto">
+            <Button variant="outline" onClick={() => {
+              setNewFolderDepartment(currentFolder?.department || (filterDept !== "all" ? filterDept : "Chung"));
+              setIsFolderDialogOpen(true);
+            }} className="w-full sm:w-auto">
               <Plus className="w-4 h-4 mr-2" />
               Tạo thư mục
             </Button>
