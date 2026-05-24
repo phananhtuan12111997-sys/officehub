@@ -118,7 +118,7 @@ export function FilePreview({ open, onOpenChange, file }: FilePreviewProps) {
       if (!isOpen) handleClose()
     }}>
       <DialogContent 
-        className="sm:max-w-4xl w-[95vw] p-0 overflow-hidden flex flex-col gap-0 border-primary/20 shadow-xl h-[85dvh] max-h-[85dvh]"
+        className="sm:max-w-4xl w-[95vw] sm:w-[90vw] p-0 overflow-hidden flex flex-col gap-0 border-primary/20 shadow-xl h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] sm:h-[85vh] sm:max-h-[85vh]"
         showCloseButton={false}
       >
         <DialogHeader className="p-2 sm:p-4 border-b bg-muted/30 flex flex-row items-center justify-between space-y-0 relative z-10 shrink-0">
