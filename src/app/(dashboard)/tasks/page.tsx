@@ -55,6 +55,7 @@ export default function TasksPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [filterPriority, setFilterPriority] = useState('all')
   const [filterAssignee, setFilterAssignee] = useState('all')
+  const [activeMobileTab, setActiveMobileTab] = useState<string>('new')
 
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
@@ -710,15 +711,33 @@ export default function TasksPage() {
           Đang tải dữ liệu...
         </div>
       ) : (
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden">
           {viewMode === 'kanban' && isMounted && (
-            <DragDropContext onDragEnd={onDragEnd}>
+            <div className="flex-1 flex flex-col h-full">
+              {/* Mobile Tabs */}
+              <div className="md:hidden flex overflow-x-auto gap-2 pb-2 mb-2 snap-x scrollbar-hide shrink-0">
+                {COLUMNS.map(col => (
+                  <Button 
+                    key={col.id} 
+                    variant={activeMobileTab === col.id ? "default" : "outline"} 
+                    className="rounded-full whitespace-nowrap snap-start shrink-0"
+                    size="sm"
+                    onClick={() => setActiveMobileTab(col.id)}
+                  >
+                    {col.title}
+                    <Badge variant={activeMobileTab === col.id ? "secondary" : "default"} className="ml-2 h-5 text-xs">
+                      {visibleTasks.filter(t => t.status === col.id).length}
+                    </Badge>
+                  </Button>
+                ))}
+              </div>
+              <DragDropContext onDragEnd={onDragEnd}>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 h-full pb-4 overflow-y-auto">
                 {COLUMNS.map((col) => {
                   const colTasks = visibleTasks.filter(t => t.status === col.id)
                   
                   return (
-                    <div key={col.id} className="flex flex-col gap-3 h-full min-h-[500px]">
+                    <div key={col.id} className={cn("flex flex-col gap-3 h-full min-h-[500px]", activeMobileTab !== col.id ? "hidden md:flex" : "flex")}>
                       <div className="flex items-center justify-between shrink-0 bg-muted/20 p-2 rounded-lg border">
                         <h3 className="font-semibold">{col.title}</h3>
                         <Badge variant="secondary">{colTasks.length}</Badge>
@@ -803,7 +822,8 @@ export default function TasksPage() {
                   )
                 })}
               </div>
-            </DragDropContext>
+              </DragDropContext>
+            </div>
           )}
 
           {viewMode === 'list' && (
