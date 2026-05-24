@@ -309,12 +309,21 @@ export default function TasksPage() {
 
   const handleDeleteTask = async (id: string) => {
     if (!confirm("Bạn có chắc chắn muốn xoá công việc này?")) return
-    const { error } = await supabase.from('tasks').delete().eq('id', id)
-    if (!error) {
-      setSelectedTask(null)
-      fetchTasks()
-    } else {
-      alert("Lỗi xoá công việc: " + error.message)
+    
+    try {
+      const res = await fetch(`/api/tasks/${id}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json()
+      
+      if (res.ok && data.success) {
+        setSelectedTask(null)
+        fetchTasks()
+      } else {
+        alert("Lỗi xoá công việc: " + (data.error || "Không xác định"))
+      }
+    } catch (err: any) {
+      alert("Lỗi kết nối: " + err.message)
     }
   }
 
