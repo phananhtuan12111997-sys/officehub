@@ -273,7 +273,7 @@ export default function DocumentsPage() {
       },
       body: JSON.stringify({ 
         name: newFolderName.trim(), 
-        department: newFolderDepartment,
+        department: currentFolder ? currentFolder.department : newFolderDepartment,
         parent_id: currentFolder?.id || null 
       })
     })
@@ -602,21 +602,22 @@ export default function DocumentsPage() {
             ref={fileInputRef} 
             onChange={handleFileChange} 
           />
-          <Button 
-            onClick={handleUploadClick} 
-            disabled={uploading || !currentFolder} 
-            className="flex items-center gap-2 relative overflow-hidden"
-            title={!currentFolder ? "Bạn cần chọn một thư mục trước khi tải file" : ""}
-          >
-            {uploading ? <Loader2 className="w-4 h-4 animate-spin relative z-10" /> : <Upload className="w-4 h-4 relative z-10" />}
-            <span className="relative z-10">{uploading ? `Đang tải lên ${Math.round(uploadProgress)}%...` : (!currentFolder ? "Chọn thư mục để tải lên" : "Tải lên tài liệu")}</span>
-            {uploading && (
-              <div 
-                className="absolute left-0 top-0 bottom-0 bg-primary/20 transition-all duration-300"
-                style={{ width: `${uploadProgress}%` }}
-              />
-            )}
-          </Button>
+          {currentFolder && (
+            <Button 
+              onClick={handleUploadClick} 
+              disabled={uploading} 
+              className="flex items-center gap-2 relative overflow-hidden"
+            >
+              {uploading ? <Loader2 className="w-4 h-4 animate-spin relative z-10" /> : <Upload className="w-4 h-4 relative z-10" />}
+              <span className="relative z-10">{uploading ? `Đang tải lên ${Math.round(uploadProgress)}%...` : "Tải lên tài liệu"}</span>
+              {uploading && (
+                <div 
+                  className="absolute left-0 top-0 bottom-0 bg-primary/20 transition-all duration-300"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              )}
+            </Button>
+          )}
         </div>
       </div>
 
