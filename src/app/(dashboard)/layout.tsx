@@ -17,6 +17,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         setLoading(false)
       }
     })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || !session) {
+        router.push('/login')
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [router])
 
   if (loading) return null

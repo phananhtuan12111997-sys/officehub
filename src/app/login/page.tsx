@@ -88,7 +88,7 @@ export default function LoginPage() {
           </CardContent>
           <CardFooter>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Đang xử lý..." : "Đang nhập"}
+              {loading ? "Đang xử lý..." : "Đăng nhập"}
             </Button>
           </CardFooter>
         </form>

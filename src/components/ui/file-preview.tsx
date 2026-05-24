@@ -127,40 +127,31 @@ export function FilePreview({ open, onOpenChange, file }: FilePreviewProps) {
       >
         <DialogHeader className="p-2 sm:p-4 border-b bg-muted/30 flex flex-row items-center justify-between space-y-0 relative z-10 shrink-0">
           <div className="flex items-center gap-2 sm:gap-3 overflow-hidden flex-1 mr-2">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="sm:hidden h-8 w-8 shrink-0 rounded-full"
-              onClick={handleClose}
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </Button>
-            <div className="p-1.5 bg-primary/10 rounded text-primary shrink-0 hidden sm:block">
+            <div className="p-1.5 bg-primary/10 rounded text-primary shrink-0">
               {getFileIcon(file.name)}
             </div>
             <DialogTitle className="truncate font-semibold text-sm sm:text-base">{file.name}</DialogTitle>
           </div>
           
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+            <Button size="icon" variant="outline" className="h-8 w-8 rounded-full sm:hidden" onClick={handlePrint} title="In tài liệu">
+              <Printer className="h-4 w-4" />
+            </Button>
             <Button size="sm" variant="outline" className="gap-2 h-8 hidden sm:flex" onClick={handlePrint} title="In tài liệu">
               <Printer className="h-4 w-4" /> <span>In</span>
             </Button>
-            <Button size="icon" variant="outline" className="gap-2 h-8 w-8 rounded-full sm:hidden" onClick={handlePrint} title="In tài liệu">
-              <Printer className="h-4 w-4" />
-            </Button>
 
+            <Button size="icon" variant="default" className="h-8 w-8 rounded-full sm:hidden" onClick={handleDownload} title="Tải xuống">
+              <Download className="h-4 w-4" />
+            </Button>
             <Button size="sm" variant="default" className="gap-2 h-8 hidden sm:flex" onClick={handleDownload} title="Tải xuống">
               <Download className="h-4 w-4" /> <span>Tải xuống</span>
             </Button>
-            <Button size="icon" variant="default" className="gap-2 h-8 w-8 rounded-full sm:hidden" onClick={handleDownload} title="Tải xuống">
-              <Download className="h-4 w-4" />
-            </Button>
             
-            {/* Close button for desktop and explicit X for clarity */}
             <Button 
               variant="ghost" 
               size="icon" 
-              className="hidden sm:flex h-8 w-8 shrink-0 rounded-full ml-1 text-muted-foreground hover:text-foreground"
+              className="flex h-8 w-8 shrink-0 rounded-full ml-1 text-muted-foreground hover:text-foreground bg-muted sm:bg-transparent"
               onClick={handleClose}
               title="Đóng"
             >
