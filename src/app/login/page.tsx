@@ -47,8 +47,8 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
       <Card className="w-full max-w-sm border-0 shadow-lg sm:border sm:shadow-sm">
         <CardHeader className="space-y-1 flex flex-col items-center text-center">
-          <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mb-2">
-            <FileText className="w-6 h-6 text-primary" />
+          <div className="flex items-center justify-center mb-2">
+            <img src="/logo.png" alt="OfficeHub Logo" className="h-20 w-auto object-contain" />
           </div>
           <CardTitle className="text-2xl font-bold">OfficeHub</CardTitle>
           <CardDescription>Đăng nhập vào hệ thống nội bộ</CardDescription>
