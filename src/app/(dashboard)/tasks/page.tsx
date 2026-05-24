@@ -328,13 +328,8 @@ export default function TasksPage() {
     }
   }
 
-  const onDragEnd = async (result: DropResult) => {
-    const { destination, source, draggableId } = result
-    if (!destination) return
-    if (destination.droppableId === source.droppableId && destination.index === source.index) return
-
-    const newStatus = destination.droppableId
-    const task = tasks.find(t => t.id === draggableId)
+  const handleUpdateStatus = async (taskId: string, newStatus: string) => {
+    const task = tasks.find(t => t.id === taskId)
     if (!task) return
 
     const currentUserProfile = users.find(u => u.id === currentUserId)
@@ -346,9 +341,12 @@ export default function TasksPage() {
       return
     }
     
-    setTasks(prev => prev.map(t => t.id === draggableId ? { ...t, status: newStatus } : t))
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t))
+    if (selectedTask && selectedTask.id === taskId) {
+       setSelectedTask(prev => prev ? { ...prev, status: newStatus } : null)
+    }
 
-    const { error } = await supabase.from('tasks').update({ status: newStatus }).eq('id', draggableId)
+    const { error } = await supabase.from('tasks').update({ status: newStatus }).eq('id', taskId)
     if (error) {
        fetchTasks()
        alert("Lỗi khi chuyển trạng thái: " + error.message)
@@ -378,6 +376,14 @@ export default function TasksPage() {
           }
        }
     }
+  }
+
+  const onDragEnd = async (result: DropResult) => {
+    const { destination, source, draggableId } = result
+    if (!destination) return
+    if (destination.droppableId === source.droppableId && destination.index === source.index) return
+
+    await handleUpdateStatus(draggableId, destination.droppableId)
   }
 
   const getPriorityColor = (p: string) => {
@@ -893,6 +899,28 @@ export default function TasksPage() {
               <div className="flex items-center gap-1 pr-8 sm:pr-10">
                 {!isEditingTask && selectedTask && (
                   <>
+                    {selectedTask.status === 'new' && (
+                      <Button variant="outline" size="sm" onClick={() => handleUpdateStatus(selectedTask.id, 'in-progress')} className="mr-2 h-8 text-xs hidden sm:flex">
+                        Đang thực hiện <ArrowRight className="ml-1 w-3 h-3" />
+                      </Button>
+                    )}
+                    {selectedTask.status === 'in-progress' && (
+                      <div className="hidden sm:flex items-center gap-2 mr-2">
+                        <Button variant="outline" size="sm" onClick={() => handleUpdateStatus(selectedTask.id, 'new')} className="h-8 text-xs">
+                          Việc mới
+                        </Button>
+                        <Button variant="default" size="sm" onClick={() => handleUpdateStatus(selectedTask.id, 'review')} className="h-8 text-xs">
+                          Chờ duyệt <ArrowRight className="ml-1 w-3 h-3" />
+                        </Button>
+                      </div>
+                    )}
+                    {selectedTask.status === 'review' && (
+                      <div className="hidden sm:flex items-center gap-2 mr-2">
+                        <Button variant="default" size="sm" onClick={() => handleUpdateStatus(selectedTask.id, 'done')} className="h-8 text-xs">
+                          Duyệt hoàn thành
+                        </Button>
+                      </div>
+                    )}
                     {(!selectedTask.creator_id || selectedTask.creator_id === currentUserId || isAdmin) && (
                       <>
                         <Button variant="ghost" size="icon" onClick={() => {
@@ -1106,6 +1134,30 @@ export default function TasksPage() {
                 <h4 className="font-semibold mb-4">Thảo luận</h4>
                 {selectedTask && <Comments taskId={selectedTask.id} />}
               </div>
+            </div>
+          )}
+          {!isEditingTask && selectedTask && (
+            <div className="flex sm:hidden flex-wrap items-center gap-2 pt-4 border-t mt-2">
+              {selectedTask.status === 'new' && (
+                <Button variant="outline" size="sm" onClick={() => handleUpdateStatus(selectedTask.id, 'in-progress')} className="flex-1 text-xs">
+                  Chuyển sang Đang thực hiện
+                </Button>
+              )}
+              {selectedTask.status === 'in-progress' && (
+                <>
+                  <Button variant="outline" size="sm" onClick={() => handleUpdateStatus(selectedTask.id, 'new')} className="flex-1 text-xs">
+                    Về Việc mới
+                  </Button>
+                  <Button variant="default" size="sm" onClick={() => handleUpdateStatus(selectedTask.id, 'review')} className="flex-1 text-xs">
+                    Gửi Chờ duyệt
+                  </Button>
+                </>
+              )}
+              {selectedTask.status === 'review' && (
+                <Button variant="default" size="sm" onClick={() => handleUpdateStatus(selectedTask.id, 'done')} className="flex-1 text-xs">
+                  Duyệt hoàn thành
+                </Button>
+              )}
             </div>
           )}
         </DialogContent>
