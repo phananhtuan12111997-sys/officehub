@@ -230,7 +230,7 @@ export default function FeedPage() {
                   user_id: u.id,
                   title: 'Thông báo chung mới',
                   message: `${senderFullName} vừa đăng thông báo: ${title}`,
-                  link: '/',
+                  link: `/post/${newPost?.id}`,
                   type: 'system'
                 }
               })
@@ -249,7 +249,7 @@ export default function FeedPage() {
                     user_id: u.id,
                     title: `Thông báo phòng ${department}`,
                     message: `${senderFullName} vừa đăng thông báo nội bộ: ${title}`,
-                    link: '/',
+                    link: `/post/${newPost?.id}`,
                     type: 'system'
                   }
                 })
