@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { FileText } from "lucide-react"
+import { FileText, Eye, EyeOff } from "lucide-react"
 import { supabase } from "@/lib/supabase/client"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
@@ -27,7 +28,12 @@ export default function LoginPage() {
     })
 
     if (error) {
-      setError(error.message)
+      const errorMapping: Record<string, string> = {
+        "Invalid login credentials": "Email hoặc mật khẩu không chính xác.",
+        "Email not confirmed": "Vui lòng xác nhận email của bạn trước khi đăng nhập.",
+        "User not found": "Người dùng không tồn tại.",
+      }
+      setError(errorMapping[error.message] || error.message)
       setLoading(false)
       return
     }
@@ -73,17 +79,26 @@ export default function LoginPage() {
                   className="text-xs text-primary hover:underline"
                   onClick={(e) => {
                     e.preventDefault();
-                    alert("Vui lòng liên hệ admin");
+                    alert("Vui lòng liên hệ admin để cấp lại mật khẩu.");
                   }}
                 >Quên mật khẩu?</a>
               </div>
-              <Input 
-                id="password" 
-                type="password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required 
-              />
+              <div className="relative">
+                <Input 
+                  id="password" 
+                  type={showPassword ? "text" : "password"} 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required 
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
           </CardContent>
           <CardFooter>

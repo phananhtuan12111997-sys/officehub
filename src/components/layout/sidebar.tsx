@@ -34,12 +34,15 @@ export function Sidebar() {
 
   return (
     <aside className="fixed inset-y-0 left-0 z-10 hidden w-14 flex-col border-r border-primary-foreground/20 bg-primary text-primary-foreground sm:flex md:w-64">
-      <div className="flex w-full items-center justify-center border-b border-primary-foreground/20 py-4 lg:py-6">
+      <div className="flex w-full items-center justify-center border-b border-primary-foreground/20 py-4 lg:py-6 overflow-hidden">
         <Link href="/" className="flex w-full items-center justify-center">
           {/* Logo cho tablet thu gọn */}
           <img src="/logo.png" alt="OfficeHub Logo" className="h-8 object-contain md:hidden" />
           {/* Logo lớn cho desktop */}
-          <img src="/logo.png" alt="OfficeHub Logo" className="hidden md:block h-16 w-auto max-w-[180px] object-contain" />
+          <div className="hidden md:flex items-center justify-center gap-3">
+            <img src="/logo.png" alt="OfficeHub Logo" className="h-20 w-auto object-contain scale-110" />
+            <span className="text-2xl font-bold tracking-wide text-white">OfficeHub</span>
+          </div>
         </Link>
       </div>
       <div className="flex-1 overflow-auto py-4">

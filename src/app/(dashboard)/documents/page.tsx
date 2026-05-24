@@ -213,7 +213,14 @@ export default function DocumentsPage() {
             cache: 'no-store'
           })
           .then(res => res.json())
-          .then(data => setFolders(data || []))
+          .then(data => {
+            if (Array.isArray(data)) {
+              setFolders(data)
+            } else {
+              console.error("Invalid folders data:", data)
+              setFolders([])
+            }
+          })
           .catch(error => {
             console.error("Error fetching folders:", error)
             setFolders([])
