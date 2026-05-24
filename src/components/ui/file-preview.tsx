@@ -76,9 +76,9 @@ export function FilePreview({ open, onOpenChange, file }: FilePreviewProps) {
     }
     
     if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) {
-      const googleViewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(file.url)}&embedded=true`
+      const officeViewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(file.url)}`
       return (
-        <iframe src={googleViewerUrl} className="w-full h-full border-0" title={file.name} />
+        <iframe src={officeViewerUrl} className="w-full h-full border-0" title={file.name} />
       )
     }
 
@@ -107,7 +107,7 @@ export function FilePreview({ open, onOpenChange, file }: FilePreviewProps) {
   const handlePrint = (e: React.MouseEvent) => {
     e.preventDefault()
     if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) {
-      window.open(`https://docs.google.com/gview?url=${encodeURIComponent(file.url)}`, '_blank')
+      window.open(`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(file.url)}`, '_blank')
     } else {
       window.open(file.url, '_blank')
     }
