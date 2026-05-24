@@ -206,11 +206,11 @@ export default function DocumentsPage() {
 
       const promises = []
 
-      // Fetch Folders
       if (!searchQuery) {
         promises.push(
-          fetch('/api/documents/folders', {
-            headers: { Authorization: `Bearer ${session.access_token}` }
+          fetch(`/api/documents/folders?t=${Date.now()}`, {
+            headers: { Authorization: `Bearer ${session.access_token}` },
+            cache: 'no-store'
           })
           .then(res => res.json())
           .then(data => setFolders(data || []))
@@ -231,12 +231,14 @@ export default function DocumentsPage() {
       } else {
         setIsSearching(false)
         if (currentFolder) {
-          url += `folder_id=${currentFolder.id}`
+          url += `folder_id=${currentFolder.id}&`
         }
       }
+      url += `t=${Date.now()}`
       promises.push(
         fetch(url, {
-          headers: { Authorization: `Bearer ${session.access_token}` }
+          headers: { Authorization: `Bearer ${session.access_token}` },
+          cache: 'no-store'
         })
         .then(res => res.json())
         .then(data => setFiles(data || []))
@@ -950,20 +952,22 @@ export default function DocumentsPage() {
                 autoFocus
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Phòng ban (Phân loại theo bộ phận)</label>
-              <Select value={newFolderDepartment} onValueChange={(val) => setNewFolderDepartment(val || "Chung")}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Chọn phòng ban" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Chung">Chung (Tất cả phòng ban)</SelectItem>
-                  {departments.map((dept) => (
-                    <SelectItem key={dept.id} value={dept.name}>Phòng {dept.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {!currentFolder && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Phòng ban (Phân loại theo bộ phận)</label>
+                <Select value={newFolderDepartment} onValueChange={(val) => setNewFolderDepartment(val || "Chung")}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn phòng ban" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Chung">Chung (Tất cả phòng ban)</SelectItem>
+                    {departments.map((dept) => (
+                      <SelectItem key={dept.id} value={dept.name}>Phòng {dept.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsFolderDialogOpen(false)}>Hủy</Button>
               <Button type="submit" disabled={creatingFolder || !newFolderName.trim()}>
