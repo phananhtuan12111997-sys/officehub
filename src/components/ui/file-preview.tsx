@@ -71,18 +71,14 @@ export function FilePreview({ open, onOpenChange, file }: FilePreviewProps) {
     
     if (ext === 'pdf') {
       return (
-        <div className="w-full h-full min-h-[50vh] rounded-md overflow-hidden border">
-          <iframe src={file.url} className="w-full h-full" title={file.name} />
-        </div>
+        <iframe src={file.url} className="w-full h-full border-0" title={file.name} />
       )
     }
     
     if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) {
       const googleViewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(file.url)}&embedded=true`
       return (
-        <div className="w-full h-full min-h-[50vh] rounded-md overflow-hidden border bg-white">
-          <iframe src={googleViewerUrl} className="w-full h-full" title={file.name} />
-        </div>
+        <iframe src={googleViewerUrl} className="w-full h-full border-0" title={file.name} />
       )
     }
 
@@ -159,7 +155,7 @@ export function FilePreview({ open, onOpenChange, file }: FilePreviewProps) {
             </Button>
           </div>
         </DialogHeader>
-        <div className="flex-1 overflow-auto p-2 sm:p-4 bg-background relative">
+        <div className={`flex-1 relative ${['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext) ? 'overflow-auto p-2 sm:p-4 bg-background' : 'overflow-hidden bg-white'}`}>
           {renderContent()}
         </div>
       </DialogContent>

@@ -356,8 +356,9 @@ export default function DocumentsPage() {
 
     const progressInterval = setInterval(() => {
       setUploadProgress(prev => {
-        if (prev >= 90) return prev;
-        return prev + Math.random() * 15;
+        if (prev >= 95) return 95;
+        const next = prev + Math.random() * 15;
+        return next > 95 ? 95 : next;
       });
     }, 200);
     
