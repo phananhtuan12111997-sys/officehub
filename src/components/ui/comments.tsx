@@ -63,6 +63,33 @@ export function Comments({ postId, taskId }: { postId?: string, taskId?: string 
     fetchComments()
     supabase.auth.getUser().then(({ data }) => setUser(data.user))
     fetchContextAuthor()
+
+    if (!postId && !taskId) return
+    
+    const channelName = postId ? `comments_post_${postId}` : `comments_task_${taskId}`
+    const filterId = postId ? `post_id=eq.${postId}` : `task_id=eq.${taskId}`
+    
+    const channel = supabase.channel(channelName)
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'comments',
+        filter: filterId
+      }, () => {
+        fetchComments()
+      })
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'comment_reactions'
+      }, () => {
+        fetchComments()
+      })
+      .subscribe()
+      
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [postId, taskId])
 
   const fetchContextAuthor = async () => {

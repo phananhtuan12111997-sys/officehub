@@ -92,7 +92,13 @@ export function Header() {
       setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n))
     }
     if (notification.link) {
-      router.push(notification.link)
+      const linkPath = notification.link.split('#')[0]
+      if (pathname === linkPath) {
+        router.push(notification.link)
+        router.refresh()
+      } else {
+        router.push(notification.link)
+      }
     }
   }
 

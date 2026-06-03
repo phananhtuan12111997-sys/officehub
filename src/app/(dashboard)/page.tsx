@@ -233,11 +233,22 @@ export default function FeedPage() {
         
         let allNotifiedUserIds = new Set<string>()
 
+        // Extract mentions
+        const mentionRegex = /data-denotation-char="@" data-id="([^"]+)"/g;
+        const mentionedUserIds = new Set<string>();
+        let match;
+        while ((match = mentionRegex.exec(content)) !== null) {
+          const mentionedId = match[1];
+          if (mentionedId !== user.id) {
+            mentionedUserIds.add(mentionedId);
+          }
+        }
+
         if (department === "Tất cả") {
           const { data: allUsers } = await supabase.from('profiles').select('id')
           if (allUsers) {
             const notifications = allUsers
-              .filter(u => u.id !== user.id)
+              .filter(u => u.id !== user.id && !mentionedUserIds.has(u.id))
               .map(u => {
                 allNotifiedUserIds.add(u.id)
                 return {
@@ -256,7 +267,7 @@ export default function FeedPage() {
             const { data: deptUsers } = await supabase.from('profiles').select('id').eq('department_id', dept.id)
             if (deptUsers) {
               const notifications = deptUsers
-                .filter(u => u.id !== user.id)
+                .filter(u => u.id !== user.id && !mentionedUserIds.has(u.id))
                 .map(u => {
                   allNotifiedUserIds.add(u.id)
                   return {
@@ -269,17 +280,6 @@ export default function FeedPage() {
                 })
               if (notifications.length > 0) await supabase.from('notifications').insert(notifications)
             }
-          }
-        }
-        
-        // Extract mentions
-        const mentionRegex = /data-denotation-char="@" data-id="([^"]+)"/g;
-        const mentionedUserIds = new Set<string>();
-        let match;
-        while ((match = mentionRegex.exec(content)) !== null) {
-          const mentionedId = match[1];
-          if (mentionedId !== user.id) {
-            mentionedUserIds.add(mentionedId);
           }
         }
         
